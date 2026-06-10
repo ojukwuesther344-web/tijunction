@@ -1,0 +1,229 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile document",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "fullName": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "bio": { "type": "string" },
+        "userType": { "type": "string", "enum": ["student", "teacher", "institute"] },
+        "profilePhoto": { "type": "string" },
+        "coverPhoto": { "type": "string" },
+        "website": { "type": "string" },
+        "location": { "type": "string" },
+        "followersCount": { "type": "integer" },
+        "followingCount": { "type": "integer" },
+        "postsCount": { "type": "integer" },
+        "verified": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "fullName", "username", "email", "createdAt"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "Social media post",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "username": { "type": "string" },
+        "profilePhoto": { "type": "string" },
+        "text": { "type": "string" },
+        "mediaUrls": { "type": "array" },
+        "mediaType": { "type": "string", "enum": ["image", "video", "none"] },
+        "likesCount": { "type": "integer" },
+        "commentsCount": { "type": "integer" },
+        "sharesCount": { "type": "integer" },
+        "hashtags": { "type": "array" },
+        "location": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "createdAt"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "Comment on a post supporting nested replies",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "postId": { "type": "string" },
+        "parentId": { "type": "string" },
+        "userId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "username": { "type": "string" },
+        "profilePhoto": { "type": "string" },
+        "text": { "type": "string" },
+        "likesCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "postId", "userId", "text", "createdAt"]
+    },
+    "Like": {
+      "title": "Like",
+      "description": "Like record on posts or comments",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "targetId": { "type": "string" },
+        "targetType": { "type": "string", "enum": ["post", "comment"] },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "targetId", "targetType", "userId", "createdAt"]
+    },
+    "Follower": {
+      "title": "Follower",
+      "description": "Tracks users following someone else",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "followerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "followerId", "createdAt"]
+    },
+    "Story": {
+      "title": "Story",
+      "description": "24-hour expiring stories",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "profilePhoto": { "type": "string" },
+        "mediaUrl": { "type": "string" },
+        "mediaType": { "type": "string", "enum": ["image", "video"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "mediaUrl", "createdAt", "expiresAt"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "Conversation between two users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "participantIds": { "type": "array" },
+        "lastMessageText": { "type": "string" },
+        "lastMessageTime": { "type": "string", "format": "date-time" },
+        "lastMessageSenderId": { "type": "string" },
+        "unreadCount": { "type": "object" }
+      },
+      "required": ["id", "participantIds"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "One-to-one chat message",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "conversationId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "text": { "type": "string" },
+        "mediaUrl": { "type": "string" },
+        "mediaType": { "type": "string", "enum": ["text", "image"] },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "conversationId", "senderId", "receiverId", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Real-time user notification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderPhoto": { "type": "string" },
+        "type": { "type": "string", "enum": ["follower", "like", "comment", "message", "mention"] },
+        "targetId": { "type": "string" },
+        "text": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "receiverId", "senderId", "type", "createdAt"]
+    },
+    "SavedPost": {
+      "title": "SavedPost",
+      "description": "Bookmarks for posts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "postId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "postId", "createdAt"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "Reported content for moderation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "reporterId": { "type": "string" },
+        "targetId": { "type": "string" },
+        "targetType": { "type": "string", "enum": ["post", "comment"] },
+        "reason": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "reporterId", "targetId", "targetType", "reason", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "User",
+      "description": "Users of the platform"
+    },
+    "posts": {
+      "schema": "Post",
+      "description": "Feed posts"
+    },
+    "comments": {
+      "schema": "Comment",
+      "description": "Post comments"
+    },
+    "likes": {
+      "schema": "Like",
+      "description": "Post and comment likes"
+    },
+    "followers": {
+      "schema": "Follower",
+      "description": "User followers relations"
+    },
+    "stories": {
+      "schema": "Story",
+      "description": "Expiring stories"
+    },
+    "conversations": {
+      "schema": "Conversation",
+      "description": "Chat conversations"
+    },
+    "conversations/{conversationId}/messages": {
+      "schema": "Message",
+      "description": "Chat messages in a conversation"
+    },
+    "notifications": {
+      "schema": "Notification",
+      "description": "User notifications"
+    },
+    "savedPosts": {
+      "schema": "SavedPost",
+      "description": "Bookmarked posts"
+    },
+    "reports": {
+      "schema": "Report",
+      "description": "Content reports for model compliance"
+    }
+  }
+}

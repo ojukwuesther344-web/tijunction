@@ -1,0 +1,6 @@
+{
+  "name": "Student Memory Network",
+  "description": "An academic social ecosystem to save student pictures, degree details, and verified university portfolios.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

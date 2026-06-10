@@ -1,0 +1,706 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { UserProfile, Post, Story, Comment, Conversation, Message, Notification } from '../types';
+
+export const INITIAL_USERS: UserProfile[] = [
+  {
+    uid: 'alex-uid',
+    fullName: 'Alex Tsimikas',
+    username: 'alextsimikas',
+    email: 'alex@collegio.edu',
+    bio: 'Writer by Profession. Artist by Passion! ✍️🎨',
+    userType: 'student',
+    profilePhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80',
+    coverPhoto: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=800&h=300&q=80',
+    website: 'alextsimikas.com',
+    location: 'Brooklyn, NY',
+    followersCount: 2467,
+    followingCount: 1589,
+    postsCount: 12,
+    verified: true,
+    createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    instituteCountry: 'United States',
+    instituteName: 'Brooklyn College',
+    degreeOrSubject: 'Creative Writing & Arts'
+  },
+  {
+    uid: 'jacob-uid',
+    fullName: 'Jacob Washington',
+    username: 'jacob_wash',
+    email: 'jacob@collegio.edu',
+    bio: 'Tech enthusiast & photography student 📸💻',
+    userType: 'student',
+    profilePhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80',
+    coverPhoto: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&h=300&q=80',
+    website: 'jacobwash.dev',
+    location: 'Boston, MA',
+    followersCount: 1205,
+    followingCount: 890,
+    postsCount: 45,
+    verified: true,
+    createdAt: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    uid: 'kat-uid',
+    fullName: 'Kat Williams',
+    username: 'kat_design',
+    email: 'kat@collegio.edu',
+    bio: 'I design experiences mostly. I also sometimes travel. 🌸',
+    userType: 'student',
+    profilePhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80',
+    coverPhoto: 'https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?auto=format&fit=crop&w=800&h=300&q=80',
+    website: 'katwilliams.design',
+    location: 'Boston, MA',
+    followersCount: 6281,
+    followingCount: 1080,
+    postsCount: 24,
+    verified: true,
+    createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    uid: 'jessica-uid',
+    fullName: 'Jessica Thompson',
+    username: 'jess_t',
+    email: 'jessica@collegio.edu',
+    bio: 'In love with culinary arts 🥣✨',
+    userType: 'student',
+    profilePhoto: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&h=150&q=80',
+    coverPhoto: 'https://images.unsplash.com/photo-1490717064594-3be2c4380240?auto=format&fit=crop&w=800&h=300&q=80',
+    website: 'jess_kitchen.org',
+    location: 'Chicago, IL',
+    followersCount: 3410,
+    followingCount: 423,
+    postsCount: 18,
+    verified: false,
+    createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    uid: 'steve-uid',
+    fullName: 'Steve Davidson',
+    username: 'steve_davidson',
+    email: 'steve@collegio.edu',
+    bio: 'Gastronomy student. Making plates and memories. 🍲🥑',
+    userType: 'student',
+    profilePhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80',
+    coverPhoto: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=800&h=300&q=80',
+    website: 'stevedavidson.cooking',
+    location: 'New York, NY',
+    followersCount: 890,
+    followingCount: 120,
+    postsCount: 10,
+    verified: false,
+    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+  }
+];
+
+export const INITIAL_POSTS: Post[] = [
+  {
+    id: 'post-1',
+    userId: 'jacob-uid',
+    fullName: 'Jacob Washington',
+    username: 'jacob_wash',
+    profilePhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80',
+    text: '"If you think you are too small to make a difference, try sleeping with a mosquito."\n- Dalai Lama',
+    mediaUrls: [
+      'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=800&h=600&q=80',
+      'https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=800&h=600&q=80'
+    ],
+    mediaType: 'image',
+    likesCount: 2245,
+    commentsCount: 45,
+    sharesCount: 124,
+    hashtags: ['motivation', 'wisdom', 'workspace'],
+    location: 'Boston, MA',
+    createdAt: new Date(Date.now() - 20 * 60 * 1000).toISOString() // 20m ago
+  },
+  {
+    id: 'post-2',
+    userId: 'kat-uid',
+    fullName: 'Kat Williams',
+    username: 'kat_design',
+    profilePhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'To all the young designers out there- learn early to read the signs from organizations only want to instrumentalize you meet their objectives and have zero intentions to attend to your growth and development as a designer. You\'ll save a lot of...',
+    mediaUrls: [
+      'https://images.unsplash.com/photo-1542744094-3a31f103e35f?auto=format&fit=crop&w=800&h=600&q=80'
+    ],
+    mediaType: 'image',
+    likesCount: 8918,
+    commentsCount: 148,
+    sharesCount: 72,
+    hashtags: ['design', 'career', 'advice'],
+    location: 'Boston, MA',
+    createdAt: new Date(Date.now() - 17 * 60 * 60 * 1000).toISOString() // 17h ago
+  },
+  {
+    id: 'post-3',
+    userId: 'steve-uid',
+    fullName: 'Steve Davidson',
+    username: 'steve_davidson',
+    profilePhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Made a fresh warm carrot-pumpkin bowl with local seeds for lunch. Simply incredible!',
+    mediaUrls: [
+      'https://images.unsplash.com/photo-1476718406336-bb5a9690ee2a?auto=format&fit=crop&w=800&h=600&q=80'
+    ],
+    mediaType: 'image',
+    likesCount: 432,
+    commentsCount: 19,
+    sharesCount: 15,
+    hashtags: ['gastronomy', 'lunchbowl', 'healthy'],
+    location: 'New York, NY',
+    createdAt: new Date(Date.now() - 35 * 60 * 1000).toISOString() // 35m ago
+  },
+  {
+    id: 'post-4',
+    userId: 'umt-uid', // institute id
+    fullName: 'UMT',
+    username: 'umtofficial',
+    profilePhoto: 'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'The Real Evolutions & Revolutions begin at UMT. Join the autumn registration panel today!',
+    mediaUrls: [
+      'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=800&h=600&q=80'
+    ],
+    mediaType: 'image',
+    likesCount: 12040,
+    commentsCount: 384,
+    sharesCount: 912,
+    hashtags: ['umt', 'education', 'revolution'],
+    location: 'Lahore, Pakistan',
+    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() // 2d ago
+  },
+  {
+    id: 'post-5',
+    userId: 'alex-uid',
+    fullName: 'Alex Tsimikas',
+    username: 'alextsimikas',
+    profilePhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Just finished editing the campus literary magazine "The Ivy Quill"! Submissions for next quarter open tomorrow. Drop by the creative writing block if you want to collaborate! 📖✏️',
+    mediaUrls: ['https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 521,
+    commentsCount: 22,
+    sharesCount: 18,
+    hashtags: ['writing', 'collegio', 'literature'],
+    location: 'Brooklyn, NY',
+    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'post-6',
+    userId: 'jessica-uid',
+    fullName: 'Jessica Thompson',
+    username: 'jess_t',
+    profilePhoto: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Baking trial for the student association food fest! Cinnamon sugar buns fresh out of the oven. Should I make them extra extra sweet? 🍩🍯✨',
+    mediaUrls: ['https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 940,
+    commentsCount: 76,
+    sharesCount: 44,
+    hashtags: ['baking', 'studentlife', 'yummy'],
+    location: 'Chicago, IL',
+    createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'post-7',
+    userId: 'steve-uid',
+    fullName: 'Steve Davidson',
+    username: 'steve_davidson',
+    profilePhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Who else spends their entire tutoring paycheck on gourmet organic ingredients? No regrets here, preparing simple hand-made ravioli with rosemary oil for the dorm mates. Dinner is served!',
+    mediaUrls: ['https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 188,
+    commentsCount: 12,
+    sharesCount: 3,
+    hashtags: ['cooking', 'collegechef', 'raviolitime'],
+    location: 'New York, NY',
+    createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'post-8',
+    userId: 'jacob-uid',
+    fullName: 'Jacob Washington',
+    username: 'jacob_wash',
+    profilePhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Golden Hour at the Campus Observatory. The sky looks absolutely cosmic tonight. 🌌🔭🪐',
+    mediaUrls: ['https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 1450,
+    commentsCount: 29,
+    sharesCount: 65,
+    hashtags: ['observatory', 'astronomy', 'beautiful'],
+    location: 'Boston, MA',
+    createdAt: new Date(Date.now() - 10 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'post-9',
+    userId: 'kat-uid',
+    fullName: 'Kat Williams',
+    username: 'kat_design',
+    profilePhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Behind the scenes at the Art and Design Senior Exhibition. Setting up the layout posters and physical design mockups. Looking forward to showing you all our graduation work!',
+    mediaUrls: ['https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 1672,
+    commentsCount: 88,
+    sharesCount: 52,
+    hashtags: ['artexhibit', 'seniordesign', 'exhibition'],
+    location: 'Boston, MA',
+    createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'post-10',
+    userId: 'alex-uid',
+    fullName: 'Alex Tsimikas',
+    username: 'alextsimikas',
+    profilePhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'A quiet morning in the college library archive. There is something intensely comforting about the smell of old paper and dust. Found some journals in the archives dating back to 1912!',
+    mediaUrls: ['https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 462,
+    commentsCount: 15,
+    sharesCount: 14,
+    hashtags: ['archives', 'peaceful', 'history'],
+    location: 'Brooklyn, NY',
+    createdAt: new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'post-11',
+    userId: 'jessica-uid',
+    fullName: 'Jessica Thompson',
+    username: 'jess_t',
+    profilePhoto: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Fresh fruit parfaits prepared with yogurt and campus harvested honey for the morning student gathering. Eat healthy, study hard, and enjoy the sun! 🍓🍌🍯',
+    mediaUrls: ['https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 720,
+    commentsCount: 31,
+    sharesCount: 22,
+    hashtags: ['parfait', 'studentbrunch', 'healthyhoney'],
+    location: 'Chicago, IL',
+    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'post-12',
+    userId: 'jacob-uid',
+    fullName: 'Jacob Washington',
+    username: 'jacob_wash',
+    profilePhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'The absolute state of the computer lab at 3 AM. Lines and lines of code, caffeinated sodas, and stack overflow tabs open. Compiling our operating system assignment. Keep coding! 💻⚙️☕',
+    mediaUrls: ['https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 1109,
+    commentsCount: 92,
+    sharesCount: 41,
+    hashtags: ['compsci', 'hackathon', 'lablife'],
+    location: 'Boston, MA',
+    createdAt: new Date(Date.now() - 1.5 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'post-13',
+    userId: 'steve-uid',
+    fullName: 'Steve Davidson',
+    username: 'steve_davidson',
+    profilePhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Found a hidden gem near the student housing quad. This handworked woodfired pizzeria makes absolute masterpieces. Crispy sourdough crust with mozzarella and fresh basil!',
+    mediaUrls: ['https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 395,
+    commentsCount: 11,
+    sharesCount: 8,
+    hashtags: ['pizza', 'campusfood', 'sourdough'],
+    location: 'New York, NY',
+    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'post-14',
+    userId: 'kat-uid',
+    fullName: 'Kat Williams',
+    username: 'kat_design',
+    profilePhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Walking through the local botanical park next to the architecture building. It is amazing how much green space we have around our campus towers! 🌿🌸⛪',
+    mediaUrls: ['https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 2210,
+    commentsCount: 65,
+    sharesCount: 110,
+    hashtags: ['greenhouse', 'nature', 'landscape'],
+    location: 'Boston, MA',
+    createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'post-15',
+    userId: 'alex-uid',
+    fullName: 'Alex Tsimikas',
+    username: 'alextsimikas',
+    profilePhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Morning coffee accompanied by classical poetry collection. Ready to start the day with inspiration. "The woods are lovely, dark and deep..." ☕📖🌲',
+    mediaUrls: ['https://images.unsplash.com/photo-1511920170033-f8396924c348?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 410,
+    commentsCount: 18,
+    sharesCount: 5,
+    hashtags: ['poetry', 'morningcoffee', 'robertfrost'],
+    location: 'Brooklyn, NY',
+    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'post-16',
+    userId: 'jessica-uid',
+    fullName: 'Jessica Thompson',
+    username: 'jess_t',
+    profilePhoto: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Healthy quinoa lunch wrap with fresh avocado, organic grilled peppers, and campus-grown microgreens. Perfect light fuel for an afternoon full of study cycles!',
+    mediaUrls: ['https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 580,
+    commentsCount: 20,
+    sharesCount: 12,
+    hashtags: ['quinoa', 'lunchbox', 'nutrition'],
+    location: 'Chicago, IL',
+    createdAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'post-17',
+    userId: 'jacob-uid',
+    fullName: 'Jacob Washington',
+    username: 'jacob_wash',
+    profilePhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Testing our high-contrast camera sensors under varied indoor lighting profiles. Preparing the sensor data vectors for computer vision pipeline validation! 🤖📷🎓',
+    mediaUrls: ['https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 1390,
+    commentsCount: 44,
+    sharesCount: 30,
+    hashtags: ['computervision', 'robotics', 'smartlens'],
+    location: 'Boston, MA',
+    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'post-18',
+    userId: 'steve-uid',
+    fullName: 'Steve Davidson',
+    username: 'steve_davidson',
+    profilePhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Baked wholewheat chocolate-chip muffins with organic honey swirl. Packed them ready for our study group session tomorrow morning. Hope everyone loves them! 🍯🧁🍫',
+    mediaUrls: ['https://images.unsplash.com/photo-1558961312-50346c09aa43?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 470,
+    commentsCount: 23,
+    sharesCount: 15,
+    hashtags: ['muffins', 'studybrunch', 'chocolatechips'],
+    location: 'New York, NY',
+    createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'post-19',
+    userId: 'kat-uid',
+    fullName: 'Kat Williams',
+    username: 'kat_design',
+    profilePhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'A majestic sunset walk past the old brick campus bell tower. The reflection on the pond water was simply spectacular tonight!',
+    mediaUrls: ['https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 2640,
+    commentsCount: 110,
+    sharesCount: 145,
+    hashtags: ['sunset', 'belltower', 'campusbeauty'],
+    location: 'Boston, MA',
+    createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'post-20',
+    userId: 'alex-uid',
+    fullName: 'Alex Tsimikas',
+    username: 'alextsimikas',
+    profilePhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Found a beautiful, quiet park corner with full wifi coverage today! Set up my study station right next to the stream. Perfect natural white noise. 🌊💻🍁',
+    mediaUrls: ['https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 520,
+    commentsCount: 12,
+    sharesCount: 6,
+    hashtags: ['whitenoise', 'parkcoding', 'peacefuloutdoors'],
+    location: 'Brooklyn, NY',
+    createdAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'post-21',
+    userId: 'jessica-uid',
+    fullName: 'Jessica Thompson',
+    username: 'jess_t',
+    profilePhoto: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Enjoying some freshly harvested green leaf tea in the department courtyard. Wishing everyone a healthy, productive week! 🍵🌱💐',
+    mediaUrls: ['https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 680,
+    commentsCount: 19,
+    sharesCount: 10,
+    hashtags: ['greentea', 'courtyard', 'focustime'],
+    location: 'Chicago, IL',
+    createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'post-22',
+    userId: 'jacob-uid',
+    fullName: 'Jacob Washington',
+    username: 'jacob_wash',
+    profilePhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Captured this pristine frame of the sunrise reflection over the design campus glass facades this morning. Incredible dynamic spectrum! 🌅🏢',
+    mediaUrls: ['https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 1845,
+    commentsCount: 50,
+    sharesCount: 38,
+    hashtags: ['architecture', 'glassreflection', 'sunrise'],
+    location: 'Boston, MA',
+    createdAt: new Date(Date.now() - 16 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'post-23',
+    userId: 'steve-uid',
+    fullName: 'Steve Davidson',
+    username: 'steve_davidson',
+    profilePhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Quick avocado toast prep before running to the biochemistry lab. Drizzled with freshly crushed red chillies and lemon zest! 🥑🌶️🍋',
+    mediaUrls: ['https://images.unsplash.com/photo-1541532713592-79a0317b6b77?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 490,
+    commentsCount: 16,
+    sharesCount: 11,
+    hashtags: ['avocadotoast', 'quickbites', 'biochemlab'],
+    location: 'New York, NY',
+    createdAt: new Date(Date.now() - 18 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'post-24',
+    userId: 'kat-uid',
+    fullName: 'Kat Williams',
+    username: 'kat_design',
+    profilePhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Throwback to high-speed drafting exercises in design fundamentals. Exploring scale, proportions, and rhythm! 📏🖊️📐',
+    mediaUrls: ['https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=800&h=600&q=80'],
+    mediaType: 'image',
+    likesCount: 2510,
+    commentsCount: 94,
+    sharesCount: 82,
+    hashtags: ['drafting', 'throwback', 'fundamentals'],
+    location: 'Boston, MA',
+    createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString()
+  }
+];
+
+export const INITIAL_STORIES: Story[] = [
+  {
+    id: 'story-1',
+    userId: 'jacob-uid',
+    username: 'jacob_wash',
+    profilePhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80',
+    mediaUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&h=800&q=80',
+    mediaType: 'image',
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'story-2',
+    userId: 'kat-uid',
+    username: 'kat_design',
+    profilePhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80',
+    mediaUrl: 'https://images.unsplash.com/photo-1526047932273-341f2a7631f9?auto=format&fit=crop&w=600&h=800&q=80',
+    mediaType: 'image',
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'story-3',
+    userId: 'steve-uid',
+    username: 'steve_davidson',
+    profilePhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80',
+    mediaUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&h=800&q=80',
+    mediaType: 'image',
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'story-4',
+    userId: 'jessica-uid',
+    username: 'jess_t',
+    profilePhoto: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&h=150&q=80',
+    mediaUrl: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=600&h=800&q=80',
+    mediaType: 'image',
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+  }
+];
+
+export const INITIAL_COMMENTS: Comment[] = [
+  {
+    id: 'c-1',
+    postId: 'post-1',
+    parentId: null,
+    userId: 'jessica-uid',
+    fullName: 'Jessica Thompson',
+    username: 'jess_t',
+    profilePhoto: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Such a timeless words! 💖',
+    likesCount: 86,
+    createdAt: new Date(Date.now() - 3 * 60 * 1000).toISOString() // 3m ago
+  },
+  {
+    id: 'c-2',
+    postId: 'post-1',
+    parentId: null,
+    userId: 'steve-uid',
+    fullName: 'Steve Davidson',
+    username: 'steve_davidson',
+    profilePhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Indeed. Tiny differences can make huge impacts! 🦟',
+    likesCount: 14,
+    createdAt: new Date(Date.now() - 8 * 60 * 1000).toISOString() // 8m ago
+  },
+  {
+    id: 'c-3',
+    postId: 'post-1',
+    parentId: 'c-1', // replying to Jessica
+    userId: 'kat-uid',
+    fullName: 'Kat Williams',
+    username: 'kat_design',
+    profilePhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80',
+    text: 'Agree! It helps me stay mindful layout-wise.',
+    likesCount: 3,
+    createdAt: new Date(Date.now() - 1 * 60 * 1000).toISOString() // 1m ago
+  }
+];
+
+export const INITIAL_CONVERSATIONS: Conversation[] = [
+  {
+    id: 'conv-1',
+    participantIds: ['alex-uid', 'jessica-uid'],
+    lastMessageText: 'Let\'s visit him this sunday 🍿',
+    lastMessageTime: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+    lastMessageSenderId: 'alex-uid',
+    unreadCount: { 'alex-uid': 0, 'jessica-uid': 1 }
+  },
+  {
+    id: 'conv-2',
+    participantIds: ['alex-uid', 'steve-uid'],
+    lastMessageText: 'Hey! Are you there?',
+    lastMessageTime: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+    lastMessageSenderId: 'steve-uid',
+    unreadCount: { 'alex-uid': 1, 'steve-uid': 0 }
+  },
+  {
+    id: 'conv-3',
+    participantIds: ['alex-uid', 'kat-uid'],
+    lastMessageText: 'Sent you an invite for next monday.',
+    lastMessageTime: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    lastMessageSenderId: 'kat-uid',
+    unreadCount: { 'alex-uid': 0, 'kat-uid': 0 }
+  }
+];
+
+export const INITIAL_MESSAGES: Message[] = [
+  {
+    id: 'msg-1',
+    conversationId: 'conv-1',
+    senderId: 'jessica-uid',
+    receiverId: 'alex-uid',
+    text: 'Alex, let\'s meet this weekend. I\'ll check with Dave too!',
+    mediaType: 'text',
+    read: true,
+    createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'msg-2',
+    conversationId: 'conv-1',
+    senderId: 'alex-uid',
+    receiverId: 'jessica-uid',
+    text: 'Sure! Let\'s aim for saturday',
+    mediaType: 'text',
+    read: true,
+    createdAt: new Date(Date.now() - 25 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'msg-3',
+    conversationId: 'conv-1',
+    senderId: 'jessica-uid',
+    receiverId: 'alex-uid',
+    text: 'I\'ll be visiting my mom this Sunday though',
+    mediaType: 'text',
+    read: true,
+    createdAt: new Date(Date.now() - 15 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'msg-4',
+    conversationId: 'conv-1',
+    senderId: 'alex-uid',
+    receiverId: 'jessica-uid',
+    text: 'Alright! Will give you a call shortly ☎️',
+    mediaType: 'text',
+    read: true,
+    createdAt: new Date(Date.now() - 10 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'msg-5',
+    conversationId: 'conv-1',
+    senderId: 'alex-uid',
+    receiverId: 'jessica-uid',
+    text: 'Let\'s visit him this sunday 🍿',
+    mediaType: 'text',
+    read: false,
+    createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString()
+  }
+];
+
+export const INITIAL_NOTIFICATIONS: Notification[] = [
+  {
+    id: 'notif-1',
+    receiverId: 'alex-uid',
+    senderId: 'jessica-uid',
+    senderName: 'Jessica Thompson',
+    senderPhoto: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&h=150&q=80',
+    type: 'like',
+    targetId: 'post-1',
+    text: 'liked your post.',
+    read: false,
+    createdAt: new Date(Date.now() - 10 * 60 * 1000).toISOString() // 10m ago
+  },
+  {
+    id: 'notif-2',
+    receiverId: 'alex-uid',
+    senderId: 'kat-uid',
+    senderName: 'Kat Williams',
+    senderPhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80',
+    type: 'comment',
+    targetId: 'post-1',
+    text: 'commented on your post: "Awesome shot!"',
+    read: false,
+    createdAt: new Date(Date.now() - 45 * 60 * 1000).toISOString() // 45m ago
+  },
+  {
+    id: 'notif-3',
+    receiverId: 'alex-uid',
+    senderId: 'steve-uid',
+    senderName: 'Steve Davidson',
+    senderPhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80',
+    type: 'follower',
+    targetId: 'alex-uid',
+    text: 'started following you.',
+    read: true,
+    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() // 1d ago
+  },
+  {
+    id: 'notif-4',
+    receiverId: 'alex-uid',
+    senderId: 'jacob-uid',
+    senderName: 'Jacob Washington',
+    senderPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80',
+    type: 'mention',
+    targetId: 'post-1',
+    text: 'mentioned you in a post.',
+    read: true,
+    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() // 2d ago
+  }
+];
