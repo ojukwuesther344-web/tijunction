@@ -8,6 +8,7 @@ import { useSocial } from '../context/SocialContext';
 import { UserType } from '../types';
 import { motion } from 'motion/react';
 import { ArrowLeft, Check, Camera, Search, HelpCircle } from 'lucide-react';
+import Logo from './Logo';
 
 export default function AuthScreens() {
   const {
@@ -34,6 +35,8 @@ export default function AuthScreens() {
   const [roleSelection, setRoleSelection] = useState<UserType>('student');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [username, setUsername] = useState('');
+  const [age, setAge] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
@@ -41,12 +44,23 @@ export default function AuthScreens() {
   
   // Education form state
   const [country, setCountry] = useState('United States');
-  const [institute, setInstitute] = useState('Brooklyn College');
-  const [degree, setDegree] = useState('Creative Writing & Arts');
+  const [institute, setInstitute] = useState('General Agency');
+  const [degree, setDegree] = useState('Creative Arts & Writing');
 
   // Verification form state
   const [regNo, setRegNo] = useState('');
   const [regPhoto, setRegPhoto] = useState('');
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setRegPhoto(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Password reset state
   const [resetEmail, setResetEmail] = useState('');
@@ -64,8 +78,13 @@ export default function AuthScreens() {
   const handleSignUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
-    if (!firstName || !lastName || !email || !password) {
+    if (!firstName || !lastName || !username || !email || !age || !password) {
       setError("Please fill out all required fields.");
+      return;
+    }
+    const parsedAge = parseInt(age, 10);
+    if (isNaN(parsedAge) || parsedAge <= 0) {
+      setError("Please enter a valid age.");
       return;
     }
     if (!agreeTerms) {
@@ -75,8 +94,7 @@ export default function AuthScreens() {
     setLoading(true);
     try {
       const fullName = `${firstName} ${lastName}`;
-      const username = `${firstName.toLowerCase()}_${lastName.toLowerCase()}`;
-      await signup(email, password, fullName, username, roleSelection);
+      await signup(email, password, fullName, username.trim().toLowerCase(), roleSelection, parsedAge);
     } catch (err: any) {
       setError(err.message || "Registration failed.");
     } finally {
@@ -108,13 +126,10 @@ export default function AuthScreens() {
 
   const handleVerificationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regNo) {
-      setError("Please fill out your Registration Number.");
-      return;
-    }
+    const generatedRegNo = "VERIFIED-" + Math.floor(1000 + Math.random() * 9000);
     setLoading(true);
     try {
-      await submitInstituteVerification(regNo, regPhoto);
+      await submitInstituteVerification(generatedRegNo, regPhoto);
     } catch (err: any) {
       setError(err.message || "Verification upload failed.");
     } finally {
@@ -194,10 +209,8 @@ export default function AuthScreens() {
 
   // Helper logo badge component
   const LogoHeader = () => (
-    <div className="flex flex-col items-center mb-6">
-      <div className="relative flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-cyan-400 to-sky-600 shadow-lg shadow-cyan-300/40 mb-3">
-        <span className="text-white text-4.5xl font-black">C</span>
-      </div>
+    <div className="flex justify-center mb-6">
+      <Logo size="md" />
     </div>
   );
 
@@ -208,12 +221,12 @@ export default function AuthScreens() {
 
       {/* Back button (Where applicable) */}
       <div className="flex items-center min-h-[44px]">
-        {onboardingStep !== 'who-are-you' && onboardingStep !== 'welcome' && (
+        {onboardingStep !== 'welcome' && (
           <button 
             id="back-auth-btn"
             onClick={() => {
               clearError();
-              if (onboardingStep === 'signup') setOnboardingStep('who-are-you');
+              if (onboardingStep === 'signup') setOnboardingStep('welcome');
               else if (onboardingStep === 'verify-email') setOnboardingStep('signup');
               else if (onboardingStep === 'edu-setup') setOnboardingStep('congrats-email');
               else if (onboardingStep === 'verify-institute') setOnboardingStep('edu-setup');
@@ -246,34 +259,6 @@ export default function AuthScreens() {
           </div>
         )}
 
-        {/* STEP 1: ROLL SELECTOR */}
-        {onboardingStep === 'who-are-you' && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-            <LogoHeader />
-            <h2 className="text-3xl font-extrabold text-center tracking-tight mb-2 text-slate-800">
-              Who are you?
-            </h2>
-            <p className="text-slate-400 text-sm text-center font-medium mb-8">
-              Select your academic affiliation to start compiling campus threads.
-            </p>
-
-            <div className="flex flex-col gap-4 w-full">
-              {(['student', 'teacher', 'institute'] as const).map((role) => (
-                <button
-                  key={role}
-                  onClick={() => handleRoleSubmit(role)}
-                  className="w-full py-4 px-6 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-700 font-extrabold text-left capitalize hover:border-cyan-400 hover:bg-cyan-50/40 hover:text-cyan-600 transition-all active:scale-[0.99] flex justify-between items-center"
-                >
-                  <span>I'm a {role}</span>
-                  <div className="w-5 h-5 rounded-full border border-slate-300 flex items-center justify-center text-white bg-white peer-checked:bg-cyan-500">
-                    <div className="w-2.5 h-2.5 rounded-full bg-transparent"></div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-
         {/* STEP 2: REGISTER ACCOUNT */}
         {onboardingStep === 'signup' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -282,7 +267,7 @@ export default function AuthScreens() {
               Sign Up
             </h2>
             <p className="text-slate-400 text-sm text-center font-medium mb-6">
-              Affiliated with a university and looking to connect?
+              Join the global network and share your world.
             </p>
 
             <form onSubmit={handleSignUpSubmit} className="flex flex-col gap-4">
@@ -306,13 +291,63 @@ export default function AuthScreens() {
               </div>
 
               <input
-                type="type"
-                placeholder="University Email (e.g., student@collegio.edu)"
-                value={email}
+                type="text"
+                placeholder="Username (e.g., alex_jones)"
                 required
-                onChange={(e) => setEmail(e.target.value)}
+                value={username}
+                onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))}
                 className="w-full p-4 border border-slate-200 rounded-xl leading-relaxed text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none"
               />
+
+              {/* Account Type Selector built inline */}
+              <div>
+                <label className="text-xs font-bold text-slate-400 block mb-1.5">Account Type</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['student', 'teacher', 'institute'] as const).map((role) => {
+                    const label = role === 'student' ? 'Individual' : role === 'teacher' ? 'Creator' : 'Business';
+                    const active = roleSelection === role;
+                    return (
+                      <button
+                        type="button"
+                        key={role}
+                        onClick={() => setRoleSelection(role)}
+                        className={`py-2 px-3 rounded-xl font-bold text-center text-xs transition-all border ${
+                          active 
+                            ? 'bg-cyan-500 text-white border-cyan-500 shadow-sm shadow-cyan-300/30' 
+                            : 'bg-slate-50 text-slate-500 border-slate-100 hover:bg-slate-100'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <input
+                    type="email"
+                    placeholder="Email Address"
+                    value={email}
+                    required
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full p-4 border border-slate-200 rounded-xl leading-relaxed text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <input
+                    type="number"
+                    placeholder="Age"
+                    required
+                    min="1"
+                    max="120"
+                    value={age}
+                    onChange={(e) => setAge(e.target.value)}
+                    className="w-full p-4 border border-slate-200 rounded-xl leading-relaxed text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none"
+                  />
+                </div>
+              </div>
 
               <input
                 type="password"
@@ -332,8 +367,7 @@ export default function AuthScreens() {
                   className="mt-1 accent-cyan-500 h-4 w-4 rounded"
                 />
                 <label htmlFor="agree-terms">
-                  *email must be of an educational institute.
-                  <br />I agree with the <span className="text-cyan-500 font-bold hover:underline cursor-pointer">Terms & Conditions</span>.
+                  I agree with the <span className="text-cyan-500 font-bold hover:underline cursor-pointer">Terms & Conditions</span> and Community Guidelines.
                 </label>
               </div>
 
@@ -406,7 +440,7 @@ export default function AuthScreens() {
               Congratulations!
             </h2>
             <p className="text-slate-500 text-sm px-6 font-medium leading-relaxed mb-8">
-              Your academic email has been verified. Let's finish building your university profile.
+              Your email address has been verified. Let's finish building your global profile.
             </p>
 
             <button
@@ -423,10 +457,10 @@ export default function AuthScreens() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <LogoHeader />
             <h2 className="text-2xl font-extrabold text-center tracking-tight mb-2 text-slate-800">
-              Your Academic Profile
+              Your Profile Details
             </h2>
             <p className="text-slate-400 text-sm text-center font-medium mb-6">
-              Select your country, institute, and parameters you are taking.
+              Select your country, industry category, and interests.
             </p>
 
             <form onSubmit={handleEduSubmit} className="flex flex-col gap-4">
@@ -442,27 +476,30 @@ export default function AuthScreens() {
                   <option value="Pakistan">Pakistan</option>
                   <option value="Australia">Australia</option>
                   <option value="Greece">Greece</option>
+                  <option value="Canada">Canada</option>
+                  <option value="Germany">Germany</option>
                 </select>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-400 block mb-1">Institute</label>
+                <label className="text-xs font-bold text-slate-400 block mb-1">Main Interest / Category</label>
                 <select
                   value={institute}
                   onChange={(e) => setInstitute(e.target.value)}
                   className="w-full p-4 border border-slate-200 rounded-xl leading-relaxed text-sm bg-slate-55 outline-none focus:border-cyan-500"
                 >
-                  <option value="Brooklyn College">Brooklyn College</option>
-                  <option value="Boston University">Boston University</option>
-                  <option value="UMT Lahore">UMT Lahore</option>
-                  <option value="Harvard University">Harvard University</option>
-                  <option value="Chicago Culinary Academy">Chicago Culinary Academy</option>
+                  <option value="Technology">Technology</option>
+                  <option value="Art & Design">Art & Design</option>
+                  <option value="Writer / Journalism">Writer / Journalism</option>
+                  <option value="Business & Finance">Business & Finance</option>
+                  <option value="Music & Entertainment">Music & Entertainment</option>
+                  <option value="Gaming & Esports">Gaming & Esports</option>
                 </select>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-400 block mb-1">
-                  {roleSelection === 'teacher' ? 'Which subject do you teach?' : 'Studying which degree?'}
+                <label className="text-xs font-bold text-slate-400 block mb-1 font-sans">
+                  Choose a Global Segment Tag
                 </label>
                 <select
                   value={degree}
@@ -473,6 +510,8 @@ export default function AuthScreens() {
                   <option value="Gastronomy & Culinary Arts">Gastronomy & Culinary Arts</option>
                   <option value="Computer Science & IT">Computer Science & IT</option>
                   <option value="Business Administration">Business Administration</option>
+                  <option value="Media & Journalism">Media & Journalism</option>
+                  <option value="Gaming & Audio Production">Gaming & Audio Production</option>
                 </select>
               </div>
 
@@ -486,52 +525,62 @@ export default function AuthScreens() {
           </motion.div>
         )}
 
-        {/* STEP 6: VERIFY YOUR INSTITUTE */}
+        {/* STEP 6: UPLOAD PROFILE PICTURE */}
         {onboardingStep === 'verify-institute' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <div className="flex justify-between items-center mb-6">
               <span></span>
               <button onClick={handleSkipVerification} className="text-cyan-500 font-bold text-sm hover:underline">
-                Skip
+                Skip for now
               </button>
             </div>
             
             <LogoHeader />
             <h2 className="text-2xl font-extrabold text-center tracking-tight mb-2 text-slate-800">
-              Verify Your Institute.
+              Upload Profile Picture
             </h2>
             <p className="text-slate-400 text-sm text-center px-4 font-medium mb-6">
-              Please, add your registration index and upload user ID photo.
+              Choose or upload a photo to represent your global account on Ti Connect.
             </p>
 
             <form onSubmit={handleVerificationSubmit} className="flex flex-col gap-4">
-              <input
-                type="text"
-                placeholder="Registration No."
-                required
-                value={regNo}
-                onChange={(e) => setRegNo(e.target.value)}
-                className="w-full p-4 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none"
-              />
+              <div className="flex flex-col items-center justify-center py-4">
+                <input 
+                  id="profile-upload-file"
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={handleFileChange} 
+                />
+                <div 
+                  onClick={() => document.getElementById('profile-upload-file')?.click()}
+                  className={`relative w-36 h-36 rounded-full border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden ${
+                    regPhoto ? 'border-cyan-500 bg-cyan-50' : 'border-slate-300 bg-slate-50 hover:border-cyan-500'
+                  }`}
+                >
+                  {regPhoto ? (
+                    <img 
+                      src={regPhoto} 
+                      alt="Uploaded Profile Picture" 
+                      className="w-full h-full object-cover animate-fade-in"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center text-slate-400 justify-center">
+                      <Camera className="w-10 h-10 stroke-1 mb-2 text-slate-400" />
+                      <span className="text-xs font-semibold text-slate-500 text-center px-4">upload profile picture</span>
+                    </div>
+                  )}
+                </div>
 
-              {/* Upload mockup placeholder */}
-              <div 
-                onClick={() => setRegPhoto('https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=400&q=80')}
-                className={`border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-colors ${
-                  regPhoto ? 'border-cyan-400 bg-cyan-50/20 text-cyan-600' : 'border-slate-200 hover:border-cyan-400 text-slate-400'
-                }`}
-              >
-                {regPhoto ? (
-                  <div className="text-center">
-                    <Check className="w-8 h-8 mx-auto mb-2 text-cyan-500" />
-                    <span className="text-xs font-bold text-cyan-500 block">ID_CARD_VERIFICATION.PNG attached</span>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); setRegPhoto(''); }} className="text-[10px] text-rose-500 underline mt-1 block">Remove</button>
-                  </div>
-                ) : (
-                  <>
-                    <Camera className="w-8 h-8 stroke-1 mb-2" />
-                    <span className="text-xs font-semibold">Attach a registration photo</span>
-                  </>
+                {regPhoto && (
+                  <button 
+                    type="button" 
+                    onClick={(e) => { e.stopPropagation(); setRegPhoto(''); }} 
+                    className="text-xs text-rose-500 font-extrabold mt-3 hover:underline"
+                  >
+                    Remove Picture
+                  </button>
                 )}
               </div>
 
@@ -540,7 +589,7 @@ export default function AuthScreens() {
                 disabled={loading}
                 className="w-full py-4 mt-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-sky-600 text-white font-extrabold shadow-md shadow-cyan-300/40"
               >
-                {loading ? 'Creating account...' : 'Next'}
+                {loading ? 'Creating account...' : 'Finish Setup'}
               </button>
             </form>
           </motion.div>
@@ -554,13 +603,13 @@ export default function AuthScreens() {
               Sign In
             </h2>
             <p className="text-slate-400 text-sm text-center font-medium mb-6">
-              Welcome back to Collegio platform.
+              Welcome back to the global network.
             </p>
 
             <form onSubmit={handleSignInSubmit} className="flex flex-col gap-4">
               <input
-                type="email"
-                placeholder="Email Address"
+                type="text"
+                placeholder="Username or Email Address"
                 value={email}
                 required
                 onChange={(e) => setEmail(e.target.value)}
@@ -771,7 +820,7 @@ export default function AuthScreens() {
       </div>
 
       <div className="flex justify-center text-xs text-slate-400 py-1 font-mono">
-         Collegio Sandbox Mode • Local Encryption Engaged
+         Tijunction Sandbox Mode • Local Encryption Engaged
       </div>
     </div>
   );

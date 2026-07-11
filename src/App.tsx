@@ -17,9 +17,13 @@ import AlertsView from './components/AlertsView';
 import ProfileView from './components/ProfileView';
 import SettingsView from './components/SettingsView';
 import ShortsView from './components/ShortsView';
+import { MenuView } from './components/MenuView';
+import Logo from './components/Logo';
 
 import { 
-  Home, Search, PlusCircle, Bell, User, MessageCircle, Settings, Menu, Video, X
+  Home, Search, PlusCircle, Bell, User, MessageCircle, Settings, Menu, Video, X,
+  Users, ShoppingBag, Flag, Bookmark, Calendar, Gift, Gamepad, Award, Radio, Rss, RefreshCw,
+  ChevronDown, ChevronUp, ChevronLeft, CreditCard, HelpCircle, Shield, Inbox, Globe, Plus, Moon, LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -32,11 +36,17 @@ function SocialAppContent() {
     conversations,
     users,
     activeTab,
-    setActiveTab
+    setActiveTab,
+    darkMode,
+    setDarkMode,
+    logout
   } = useSocial();
 
   // Let other pages request target user profile viewing
   const [targetProfileUid, setTargetProfileUid] = useState<string | null>(null);
+
+  // Nested sub-views state inside SettingsView
+  const [activeSubView, setActiveSubView] = useState<string | null>(null);
 
   // Scroll state to auto hide/show bottom navigation bar
   const [showToolbar, setShowToolbar] = useState(true);
@@ -128,142 +138,323 @@ function SocialAppContent() {
     return <AuthScreens />;
   }
 
-  // RENDER PRIMARY MOBILE FRAME APP INTERFACE
+  // Helper to render current active view content
+  const renderActiveViewContent = () => {
+    return (
+      <AnimatePresence mode="wait">
+        {activeTab === 'home' && (
+          <motion.div key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex-1 flex flex-col min-h-full">
+            <HomeFeedView />
+          </motion.div>
+        )}
+
+        {activeTab === 'search' && (
+          <motion.div key="search" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex-1 flex flex-col min-h-full">
+            <SearchView />
+          </motion.div>
+        )}
+
+        {activeTab === 'create' && (
+          <motion.div key="create" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex-1 flex flex-col min-h-full">
+            <CreatePostView onComplete={handleCreatePostComplete} />
+          </motion.div>
+        )}
+
+        {activeTab === 'shorts' && (
+          <motion.div 
+            key="shorts" 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black z-45 flex flex-col w-full h-full"
+          >
+            <ShortsView />
+          </motion.div>
+        )}
+
+        {activeTab === 'chat' && (
+          <motion.div key="chat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex-1 flex flex-col min-h-full">
+            <ChatView />
+          </motion.div>
+        )}
+
+        {activeTab === 'alerts' && (
+          <motion.div key="alerts" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex-1 flex flex-col min-h-full">
+            <AlertsView />
+          </motion.div>
+        )}
+
+        {activeTab === 'profile' && (
+          <motion.div key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex-1 flex flex-col min-h-full">
+            <ProfileView 
+              altTargetUid={targetProfileUid} 
+              onClearTarget={() => setTargetProfileUid(null)} 
+              openSettingsTab={openSettingsFromProfile}
+            />
+          </motion.div>
+        )}
+
+        {activeTab === 'settings' && (
+          <motion.div key="settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex-1 flex flex-col min-h-full animate-fadeIn">
+            <SettingsView activeSubView={activeSubView} setActiveSubView={setActiveSubView} />
+          </motion.div>
+        )}
+
+        {activeTab === 'menu' && (
+          <motion.div key="menu" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex-1 flex flex-col min-h-full">
+            <MenuView 
+              onSelectProfile={(uid) => {
+                setTargetProfileUid(uid);
+                setActiveTab('profile');
+              }}
+              onNavigateToSubView={(tab, subView) => {
+                setActiveTab(tab);
+                setActiveSubView(subView);
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
+  };
+
+  // RENDER RESPONSIVE INTERFACES FOR DESKTOP & MOBILE
   return (
-    <div className="min-h-screen bg-slate-900 flex justify-center items-center font-sans select-none antialiased md:py-6 md:px-4">
-      {/* Simulation phone chassis bezel frame */}
-      <div className="w-full max-w-md bg-white min-h-screen md:min-h-[850px] shadow-2xl relative md:rounded-[48px] overflow-hidden border-8 border-slate-950 flex flex-col">
+    <div className="min-h-screen bg-[#f1f3f6] font-sans antialiased text-slate-800 flex justify-center">
+      
+      {/* 1. UNIVERSAL DESKTOP DUAL VIEWPORT FRAME (Flex row on desktop, hidden on mobile) */}
+      <div className="hidden md:flex w-full max-w-7xl mx-auto min-h-screen relative gap-6 px-4">
         
-        {/* Dynamic Notch / Ear Speaker mockup for mobile simulation */}
-        <div className="hidden md:block absolute top-0 left-1/2 -translate-x-1/2 h-6 w-36 bg-black rounded-b-2xl z-50"></div>
+        {/* DESKTOP SIDEBAR PANEL (LEFT) */}
+        <aside className="w-64 xl:w-72 flex flex-col h-screen sticky top-0 py-6 pr-4 justify-between flex-shrink-0 z-30">
+          <div className="flex flex-col gap-6">
+            <div className="py-2 px-1">
+              <Logo size="md" />
+            </div>
 
-        {/* Content area based on tab */}
-        <div 
-          className={`flex-1 ${activeTab === 'shorts' ? 'overflow-hidden pt-0 pb-0' : 'overflow-y-auto mt-[120px] md:mt-[144px] pb-[80px]'}`} 
-          onScroll={handleScroll}
-        >
-          <AnimatePresence mode="wait">
-            {activeTab === 'home' && (
-              <motion.div key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <HomeFeedView />
-              </motion.div>
-            )}
-
-            {activeTab === 'search' && (
-              <motion.div key="search" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <SearchView />
-              </motion.div>
-            )}
-
-            {activeTab === 'create' && (
-              <motion.div key="create" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <CreatePostView onComplete={handleCreatePostComplete} />
-              </motion.div>
-            )}
-
-            {activeTab === 'shorts' && (
-              <motion.div 
-                key="shorts" 
-                initial={{ opacity: 0 }} 
-                animate={{ opacity: 1 }} 
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-black z-45 flex flex-col"
-              >
-                <ShortsView />
-              </motion.div>
-            )}
-
-            {activeTab === 'chat' && (
-              <motion.div key="chat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <ChatView />
-              </motion.div>
-            )}
-
-            {activeTab === 'alerts' && (
-              <motion.div key="alerts" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <AlertsView />
-              </motion.div>
-            )}
-
-            {activeTab === 'profile' && (
-              <motion.div key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <ProfileView 
-                  altTargetUid={targetProfileUid} 
-                  onClearTarget={() => setTargetProfileUid(null)} 
-                  openSettingsTab={openSettingsFromProfile}
-                />
-              </motion.div>
-            )}
-
-            {activeTab === 'settings' && (
-              <motion.div key="settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <SettingsView />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Floating Hotkeys target shortcut list (undercovers target profile navigation preview) */}
-        <div className="absolute bottom-6 right-4 flex flex-col gap-2 z-20">
-          {activeTab === 'home' && users.length > 0 && (
-            <div className="flex flex-col items-end gap-1">
-              <span className="text-[10px] font-bold text-slate-400 bg-white shadow-sm p-1 px-2.5 rounded-full capitalize border border-slate-100">Quick view peer:</span>
+            <nav className="flex flex-col gap-1">
               <button 
-                onClick={() => handleProfileLookup(users[1].uid)}
-                className="p-2.5 bg-gradient-to-r from-cyan-400 to-sky-600 rounded-full text-white text-xs font-black shadow-lg flex items-center gap-1 hover:scale-105 transition-all"
+                onClick={() => { setActiveTab('home'); setTargetProfileUid(null); }}
+                className={`flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all duration-150 font-extrabold text-sm ${
+                  activeTab === 'home' 
+                    ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/20' 
+                    : 'text-slate-600 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-100'
+                }`}
               >
-                🎓 @{users[1].username}
+                <Home className="w-5 h-5 stroke-[2.5]" />
+                <span>Home Feed</span>
               </button>
+
+              <button 
+                onClick={() => setActiveTab('search')}
+                className={`flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all duration-150 font-extrabold text-sm ${
+                  activeTab === 'search' 
+                    ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/20' 
+                    : 'text-slate-600 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-100'
+                }`}
+              >
+                <Search className="w-5 h-5 stroke-[2.5]" />
+                <span>Search Explore</span>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('chat')}
+                className={`flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all duration-150 font-extrabold text-sm relative ${
+                  activeTab === 'chat' 
+                    ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/20' 
+                    : 'text-slate-600 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-100'
+                }`}
+              >
+                <MessageCircle className="w-5 h-5 stroke-[2.5]" />
+                <span className="flex-1 text-left">Direct Messages</span>
+                <span className="absolute top-4 right-4 w-2 h-2 bg-pink-500 rounded-full animate-pulse"></span>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('shorts')}
+                className={`flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all duration-150 font-extrabold text-sm ${
+                  activeTab === 'shorts' 
+                    ? 'bg-pink-500 text-white shadow-md shadow-pink-500/20' 
+                    : 'text-slate-600 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-100'
+                }`}
+              >
+                <Video className="w-5 h-5 stroke-[2.5]" />
+                <span>Short Reels</span>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('alerts')}
+                className={`flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all duration-150 font-extrabold text-sm relative ${
+                  activeTab === 'alerts' 
+                    ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/20' 
+                    : 'text-slate-600 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-100'
+                }`}
+              >
+                <Bell className="w-5 h-5 stroke-[2.5]" />
+                <span className="flex-1 text-left">Alerts</span>
+                {unreadAlertsCount > 0 ? (
+                  <span className="bg-pink-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
+                    {unreadAlertsCount}
+                  </span>
+                ) : (
+                  <span className="w-2 h-2 bg-cyan-500 rounded-full"></span>
+                )}
+              </button>
+
+              <button 
+                onClick={() => { setActiveTab('profile'); setTargetProfileUid(null); }}
+                className={`flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all duration-150 font-extrabold text-sm ${
+                  activeTab === 'profile' && !targetProfileUid
+                    ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/20' 
+                    : 'text-slate-600 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-100'
+                }`}
+              >
+                <User className="w-5 h-5 stroke-[2.5]" />
+                <span>My Profile</span>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('settings')}
+                className={`flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all duration-150 font-extrabold text-sm ${
+                  activeTab === 'settings' 
+                    ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/20' 
+                    : 'text-slate-600 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-100'
+                }`}
+              >
+                <Settings className="w-5 h-5 stroke-[2.5]" />
+                <span>Settings</span>
+              </button>
+            </nav>
+
+            <button 
+              onClick={() => setActiveTab('create')}
+              className="mt-2 w-full py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-sky-600 hover:opacity-95 text-white font-extrabold text-sm shadow-lg shadow-cyan-500/25 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+            >
+              <PlusCircle className="w-5 h-5" />
+              <span>Create Post</span>
+            </button>
+          </div>
+
+          {/* User profile section at bottom of desktop left sidebar */}
+          <div className="border-t border-slate-200/80 pt-4 flex items-center justify-between">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <img 
+                src={currentUser?.profilePhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80'} 
+                alt="Me" 
+                className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                referrerPolicy="no-referrer"
+              />
+              <div className="flex flex-col text-left overflow-hidden">
+                <span className="text-xs font-black text-slate-800 truncate leading-tight">{currentUser?.fullName}</span>
+                <span className="text-[10px] text-slate-400 font-extrabold truncate">@{currentUser?.username}</span>
+              </div>
+            </div>
+            <button 
+              onClick={() => logout()}
+              className="p-2 hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-xl transition-all active:scale-95"
+              title="Sign Out"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
+        </aside>
+
+        {/* DESKTOP MAIN VIEWPORT COLUMN */}
+        <main className="flex-1 max-w-2xl bg-[#f0f2f5] border-l border-r border-slate-200/50 h-screen overflow-y-auto relative flex flex-col scrollbar-none shadow-sm">
+          {renderActiveViewContent()}
+        </main>
+
+        {/* DESKTOP SIDEBAR DETAILS (RIGHT) */}
+        <aside className="hidden lg:flex flex-col w-80 py-6 h-screen overflow-y-auto gap-5 sticky top-0 scrollbar-none flex-shrink-0">
+          {/* Sandbox controller card */}
+          <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-xl text-white">
+            <span className="text-xs font-black text-cyan-400 uppercase tracking-widest block mb-2">Sandbox Controller</span>
+            <h2 className="text-lg font-black leading-tight tracking-tight">
+              Ti Connect Global Network
+            </h2>
+            <p className="text-[11px] text-slate-300 mt-2 leading-relaxed font-semibold">
+              A universal social ecosystem to connect individuals, creators, and businesses to share ideas, media, and daily moments.
+            </p>
+
+            <div className="bg-slate-900/50 p-3 mt-4 rounded-2xl border border-dashed border-slate-700/60">
+              <span className="text-[10px] font-mono font-bold text-cyan-400 block mb-1">💡 Sandbox Shortcuts:</span>
+              <ul className="text-[10px] text-slate-400 space-y-1 font-semibold list-disc list-inside">
+                <li>Skip email OTP with code <code className="text-cyan-400 font-mono">1111</code></li>
+                <li>Simulate live messages dynamically</li>
+                <li>Switch profiles instantly below</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Quick peer switcher */}
+          {users.length > 0 && (
+            <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col gap-3">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Quick Profile Viewer</span>
+              <div className="flex flex-col gap-2">
+                {users.slice(0, 3).map((peer) => (
+                  <button 
+                    key={peer.uid}
+                    onClick={() => handleProfileLookup(peer.uid)}
+                    className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-slate-50 transition-all text-left border border-slate-100 hover:border-slate-200"
+                  >
+                    <img src={peer.profilePhoto} className="w-8 h-8 rounded-full object-cover" referrerPolicy="no-referrer" />
+                    <div className="flex-1 overflow-hidden">
+                      <div className="text-xs font-bold text-slate-800 truncate">{peer.fullName}</div>
+                      <div className="text-[9px] text-slate-400 font-bold">@{peer.username}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
-        </div>
 
-        {/* Top unified navigation container */}
-        <nav className={`absolute top-0 left-0 right-0 bg-white border-b border-slate-100/90 flex flex-col z-30 shadow-[0_4px_24px_rgba(0,0,0,0.04)] rounded-b-3xl transition-all duration-200 ease-in-out transform ${
-          activeTab === 'shorts' ? '-translate-y-[110%] opacity-0 pointer-events-none' : (showToolbar ? 'translate-y-0 opacity-100' : '-translate-y-[110%] opacity-0 pointer-events-none')
-        } ${activeTab !== 'shorts' ? 'md:pt-8 pt-4' : 'pt-3'}`}>
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between text-slate-500 font-bold text-xs">
+            <span>Global Status: Active</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          </div>
+        </aside>
+
+      </div>
+
+      {/* 2. NATIVE RESPONSIVE MOBILE APP INTERFACE (Visible on mobile screens < md) */}
+      <div className="md:hidden w-full min-h-screen bg-white relative flex flex-col overflow-hidden">
+        
+        {/* Mobile top unified navigation container */}
+        <nav className={`absolute top-0 left-0 right-0 bg-white border-b border-slate-100/90 flex flex-col z-30 shadow-[0_4px_24px_rgba(0,0,0,0.04)] transition-all duration-200 ease-in-out transform ${
+          (activeTab === 'shorts' || activeTab === 'menu') ? '-translate-y-[110%] opacity-0 pointer-events-none' : (showToolbar ? 'translate-y-0 opacity-100' : '-translate-y-[110%] opacity-0 pointer-events-none')
+        } pt-4`}>
           
           {/* Row 1: Logo and Action Buttons */}
           <div className="px-5 py-3 flex items-center justify-between">
             {/* Logo */}
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-sky-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md">
-                C
-              </div>
-              <div>
-                <h1 className="text-xl font-black bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent tracking-tight leading-none mb-1">
-                  collegio
-                </h1>
-                <p className="text-[9px] text-slate-400 font-bold tracking-wider uppercase leading-none">Campus Feed</p>
-              </div>
-            </div>
+            <Logo size="sm" />
 
             {/* Top Right Actions */}
             <div className="flex items-center gap-2">
               <button 
                 onClick={() => setActiveTab('search')}
                 className="p-2 w-10 h-10 rounded-full bg-slate-100/90 hover:bg-slate-200 text-slate-700 transition-all active:scale-95 flex items-center justify-center border border-slate-200/25"
-                title="Search campus"
+                title="Search network"
               >
                 <Search className="w-5 h-5 stroke-[2.5]" />
               </button>
 
               <button 
                 onClick={() => {
-                  if (activeTab === 'settings') {
+                  if (activeTab === 'menu') {
                     setActiveTab('home');
                   } else {
-                    setActiveTab('settings');
+                    setActiveTab('menu');
                   }
                 }}
-                className="p-2 w-10 h-10 rounded-full bg-slate-100/90 hover:bg-slate-200 text-slate-700 transition-all active:scale-95 flex items-center justify-center border border-slate-200/25"
-                title={activeTab === 'settings' ? "Close settings" : "Open settings"}
+                className={`p-2 w-10 h-10 rounded-full transition-all active:scale-95 flex items-center justify-center border ${
+                  activeTab === 'menu'
+                    ? 'bg-cyan-500 text-white border-cyan-500 shadow-sm'
+                    : 'bg-slate-100/90 hover:bg-slate-200 text-slate-700 border-slate-200/25'
+                }`}
+                title="Menu"
               >
-                {activeTab === 'settings' ? (
-                  <X className="w-5 h-5 stroke-[2.5]" />
-                ) : (
-                  <Menu className="w-5 h-5 stroke-[2.5]" />
-                )}
+                <Menu className="w-5 h-5 stroke-[2.5]" />
               </button>
             </div>
           </div>
@@ -343,37 +534,37 @@ function SocialAppContent() {
             </button>
           </div>
         </nav>
-      </div>
 
-      {/* Extra floating side widgets explaining Sandbox mode */}
-      <div className="hidden lg:flex flex-col gap-4 max-w-xs ml-8 text-white">
-        <div className="bg-slate-800 p-6 rounded-3xl border border-slate-705 shadow-xl">
-          <span className="text-xs font-black text-cyan-400 uppercase tracking-widest block mb-2">Sandbox Controller</span>
-          <h2 className="text-2xl font-black leading-tight tracking-tight text-white">
-            Collegio Memory Network
-          </h2>
-          <p className="text-xs text-slate-300 mt-2 leading-relaxed font-semibold">
-            An academic social ecosystem to save student pictures, degree details, and verified university portfolios.
-          </p>
-
-          <div className="bg-slate-900/50 p-3.5 rounded-2xl border border-dashed border-slate-700/60 mt-4">
-            <span className="text-[10px] font-mono font-bold text-cyan-453 block mb-1">💡 Sandbox Shortcuts:</span>
-            <ul className="text-[10px] text-slate-400 space-y-1 font-semibold list-disc list-inside">
-              <li>Skip email OTP validation with verification code <code className="text-cyan-400 text-xs font-mono">1111</code></li>
-              <li>Toggle between students from the Quick peer button</li>
-              <li>Switch templates and paste image attachments</li>
-              <li>Simulate real-time live messaging replies</li>
-            </ul>
-          </div>
+        {/* Content Area */}
+        <div 
+          className={`flex-1 bg-[#f0f2f5] ${
+            activeTab === 'shorts' 
+              ? 'overflow-hidden pt-0 pb-0' 
+              : activeTab === 'menu'
+                ? 'overflow-y-auto pt-0 pb-[80px]'
+                : 'overflow-y-auto mt-[120px] pb-[80px]'
+          }`} 
+          onScroll={handleScroll}
+        >
+          {renderActiveViewContent()}
         </div>
 
-        <div className="bg-slate-800 p-4.5 rounded-2xl border border-slate-705 flex items-center justify-between">
-          <div className="text-slate-400 font-bold text-xs">
-            Device status : Online
-          </div>
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        {/* Floating action buttons */}
+        <div className="absolute bottom-6 right-4 flex flex-col gap-2 z-20">
+          {activeTab === 'home' && users.length > 0 && (
+            <div className="flex flex-col items-end gap-1">
+              <span className="text-[10px] font-bold text-slate-400 bg-white shadow-sm p-1 px-2.5 rounded-full capitalize border border-slate-100">Quick view peer:</span>
+              <button 
+                onClick={() => handleProfileLookup(users[1].uid)}
+                className="p-2.5 bg-gradient-to-r from-cyan-400 to-sky-600 rounded-full text-white text-xs font-black shadow-lg flex items-center gap-1 hover:scale-105 transition-all"
+              >
+                🎓 @{users[1].username}
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
     </div>
   );
 }

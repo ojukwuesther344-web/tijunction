@@ -10,7 +10,7 @@
         "username": { "type": "string" },
         "email": { "type": "string" },
         "bio": { "type": "string" },
-        "userType": { "type": "string", "enum": ["student", "teacher", "institute"] },
+        "userType": { "type": "string", "enum": ["individual", "creator", "business"] },
         "profilePhoto": { "type": "string" },
         "coverPhoto": { "type": "string" },
         "website": { "type": "string" },
@@ -178,6 +178,23 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "reporterId", "targetId", "targetType", "reason", "createdAt"]
+    },
+    "UserActivity": {
+      "title": "UserActivity",
+      "description": "Live real record of user activity on the platform",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "username": { "type": "string" },
+        "profilePhoto": { "type": "string" },
+        "activityType": { "type": "string", "enum": ["signup", "login", "create_post", "delete_post", "like_post", "add_comment", "follow", "unfollow", "send_message", "create_story", "create_reel"] },
+        "activityDetails": { "type": "string" },
+        "targetId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "activityType", "activityDetails", "createdAt"]
     }
   },
   "firestore": {
@@ -224,6 +241,10 @@
     "reports": {
       "schema": "Report",
       "description": "Content reports for model compliance"
+    },
+    "userActivities": {
+      "schema": "UserActivity",
+      "description": "Live global user activities"
     }
   }
 }

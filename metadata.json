@@ -1,6 +1,6 @@
 {
-  "name": "Student Memory Network",
-  "description": "An academic social ecosystem to save student pictures, degree details, and verified university portfolios.",
+  "name": "Ti Connect",
+  "description": "The premier global social ecosystem to connect, share, and establish professional relationships worldwide.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

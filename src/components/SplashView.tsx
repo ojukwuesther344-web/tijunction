@@ -5,6 +5,7 @@
 
 import { useEffect } from 'react';
 import { motion } from 'motion/react';
+import Logo from './Logo';
 
 interface SplashViewProps {
   onComplete: () => void;
@@ -32,17 +33,9 @@ export default function SplashView({ onComplete }: SplashViewProps) {
         transition={{ duration: 1, ease: "easeOut" }}
         className="flex flex-col items-center text-center"
       >
-        {/* Rounded double concentric nested cyan circles for logo */}
-        <div id="splash-logo-container" className="relative flex items-center justify-center w-28 h-28 rounded-full bg-gradient-to-br from-cyan-400 to-sky-600 shadow-xl shadow-cyan-300/40 mb-6">
-          <span className="text-white text-6xl font-sans font-bold tracking-tight">C</span>
-          <div className="absolute -inset-2 rounded-full border border-sky-200/50 animate-pulse"></div>
-        </div>
-
-        <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">
-          collegio
-        </h1>
+        <Logo size="lg" className="mb-4" />
         <p className="text-slate-500 font-medium text-sm mt-3 tracking-wide">
-          We Save Memories.
+          Connect • Share • Belong.
         </p>
       </motion.div>
 

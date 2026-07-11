@@ -21,6 +21,7 @@ export interface UserProfile {
   postsCount: number;
   verified: boolean;
   createdAt: string;
+  age?: number;
   // Account details from institute registration
   instituteCountry?: string;
   instituteName?: string;
@@ -165,6 +166,18 @@ export interface Reel {
   likesCount: number;
   commentsCount: number;
   sharesCount: number;
+  createdAt: string;
+}
+
+export interface UserActivity {
+  id: string;
+  userId: string;
+  fullName: string;
+  username: string;
+  profilePhoto: string;
+  activityType: 'signup' | 'login' | 'create_post' | 'delete_post' | 'like_post' | 'add_comment' | 'follow' | 'unfollow' | 'send_message' | 'create_story' | 'create_reel';
+  activityDetails: string;
+  targetId: string;
   createdAt: string;
 }
 

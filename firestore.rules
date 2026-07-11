@@ -36,7 +36,7 @@ service cloud.firestore {
         && data.username is string && data.username.size() <= 60
         && data.email is string && data.email.size() <= 150
         && (!('bio' in data) || (data.bio is string && data.bio.size() <= 1000))
-        && (!('userType' in data) || data.userType in ['student', 'teacher', 'institute'])
+        && (!('userType' in data) || data.userType in ['individual', 'creator', 'business'])
         && (!('profilePhoto' in data) || (data.profilePhoto is string && data.profilePhoto.size() <= 1000))
         && (!('coverPhoto' in data) || (data.coverPhoto is string && data.coverPhoto.size() <= 1000))
         && (!('website' in data) || (data.website is string && data.website.size() <= 500))
@@ -143,6 +143,32 @@ service cloud.firestore {
         && isStringOrTimestamp(data.createdAt);
     }
 
+    function isValidReel(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.userId is string && data.userId == request.auth.uid
+        && data.fullName is string
+        && data.username is string
+        && (!('profilePhoto' in data) || data.profilePhoto is string)
+        && data.videoUrl is string && data.videoUrl.size() <= 2000
+        && (!('caption' in data) || (data.caption is string && data.caption.size() <= 2000))
+        && (!('likesCount' in data) || data.likesCount is int)
+        && (!('commentsCount' in data) || data.commentsCount is int)
+        && (!('sharesCount' in data) || data.sharesCount is int)
+        && isStringOrTimestamp(data.createdAt);
+    }
+
+    function isValidUserActivity(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.userId is string && data.userId == request.auth.uid
+        && (!('fullName' in data) || data.fullName is string)
+        && (!('username' in data) || data.username is string)
+        && (!('profilePhoto' in data) || data.profilePhoto is string)
+        && data.activityType in ["signup", "login", "create_post", "delete_post", "like_post", "add_comment", "follow", "unfollow", "send_message", "create_story", "create_reel"]
+        && data.activityDetails is string && data.activityDetails.size() <= 2000
+        && (!('targetId' in data) || data.targetId is string)
+        && isStringOrTimestamp(data.createdAt);
+    }
+
     // --- COLLECTION PATH MATCHERS ---
 
     match /users/{userId} {
@@ -241,6 +267,21 @@ service cloud.firestore {
       allow read, list: if isSignedIn();
       allow create: if isSignedIn() && incoming().reporterId == request.auth.uid && isValidReport(incoming());
       allow update, delete: if isSignedIn();
+    }
+
+    match /reels/{reelId} {
+      allow read, list: if isSignedIn();
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid && isValidReel(incoming());
+      allow update: if isSignedIn() && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'commentsCount', 'sharesCount'])
+      );
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /userActivities/{activityId} {
+      allow read, list: if isSignedIn();
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid && isValidUserActivity(incoming());
+      allow update, delete: if false;
     }
   }
 }

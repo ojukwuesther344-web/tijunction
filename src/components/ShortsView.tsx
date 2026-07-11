@@ -12,13 +12,17 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function ShortsView() {
-  const { reels, createReel, toggleLikeReel, currentUser, setActiveTab } = useSocial();
+  const { reels, createReel, toggleLikeReel, currentUser, setActiveTab, uploadMediaFile } = useSocial();
   const [activeReelIdx, setActiveReelIdx] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [videoUrl, setVideoUrl] = useState('');
   const [caption, setCaption] = useState('');
   const [likedAnimMap, setLikedAnimMap] = useState<{ [reelId: string]: boolean }>({});
+  
+  const [reelFile, setReelFile] = useState<File | null>(null);
+  const [reelUploadLoading, setReelUploadLoading] = useState(false);
+  const reelFileInputRef = useRef<HTMLInputElement>(null);
 
   // Preset academic loops for easier sandbox testing
   const videoTemplates = [
@@ -48,13 +52,27 @@ export default function ShortsView() {
     }, 850);
   };
 
-  const handleUploadSubmit = (e: React.FormEvent) => {
+  const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const finalUrl = videoUrl || videoTemplates[0].url;
-    createReel(finalUrl, caption);
-    setVideoUrl('');
-    setCaption('');
-    setShowUploadModal(false);
+    setReelUploadLoading(true);
+    try {
+      let finalUrl = videoUrl;
+      if (reelFile) {
+        finalUrl = await uploadMediaFile(reelFile, 'reels');
+      } else {
+        finalUrl = videoUrl || videoTemplates[0].url;
+      }
+      await createReel(finalUrl, caption);
+      setVideoUrl('');
+      setCaption('');
+      setReelFile(null);
+      setShowUploadModal(false);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to upload short video: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setReelUploadLoading(false);
+    }
   };
 
   return (
@@ -76,7 +94,7 @@ export default function ShortsView() {
             LIVE
           </span>
           <h2 className="text-lg font-black tracking-tight font-sans bg-gradient-to-r from-stone-100 to-slate-200 bg-clip-text text-transparent">
-            collegio <span className="font-medium text-pink-400">shorts</span>
+            ti connect <span className="font-medium text-pink-400">shorts</span>
           </h2>
         </div>
 
@@ -95,8 +113,8 @@ export default function ShortsView() {
         {reels.length === 0 ? (
           <div className="p-8 text-center flex flex-col items-center justify-center h-full text-slate-400 gap-2">
             <Sparkles className="w-12 h-12 text-slate-500 animate-spin" />
-            <p className="font-extrabold text-sm">No collegio reels yet!</p>
-            <p className="text-xs">Be the first custom uploader in your college quad.</p>
+            <p className="font-extrabold text-sm">No reels uploaded yet!</p>
+            <p className="text-xs">Be the first custom uploader in the global feed.</p>
           </div>
         ) : (
           <div className="w-full h-full absolute inset-0 flex items-center justify-center overflow-hidden">
@@ -199,7 +217,7 @@ export default function ShortsView() {
                     <div className="flex items-center gap-2 mb-1.5 mt-2">
                       <span className="text-sm font-black text-stone-50">@{reel.username}</span>
                       <span className="text-[9px] bg-cyan-500/90 text-white font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider">
-                        STUDENT PORTFOLIO
+                        VERIFIED PROFILE
                       </span>
                     </div>
 
@@ -209,7 +227,7 @@ export default function ShortsView() {
 
                     <div className="flex items-center gap-1.5 mt-3.5 text-[10px] text-slate-300 font-semibold truncate bg-white/10 p-1.5 py-1 rounded-lg w-fit">
                       <Music className="w-3 h-3 text-cyan-400 animate-spin" />
-                      <span className="truncate">Original Audio • Collegio Campus Feed</span>
+                      <span className="truncate">Original Audio • Ti Connect Global Feed</span>
                     </div>
                   </div>
                 </div>
@@ -249,8 +267,8 @@ export default function ShortsView() {
             >
               <div className="flex justify-between items-center pb-2 border-b border-slate-100">
                 <div>
-                  <h3 className="text-xl font-black text-slate-900">Upload Campus Short</h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">Publish to Collegio Reels</p>
+                  <h3 className="text-xl font-black text-slate-900">Upload Short Reel</h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">Publish to Global Reels</p>
                 </div>
                 <button 
                   onClick={() => setShowUploadModal(false)} 
@@ -286,12 +304,60 @@ export default function ShortsView() {
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-extrabold text-slate-400 block uppercase tracking-wider">
-                    Or Enter Custom MP4 Video Link
+                    Upload Short Video or Enter MP4 Link
                   </label>
+                  
+                  {/* File Upload Trigger */}
+                  <div 
+                    onClick={() => reelFileInputRef.current?.click()}
+                    className="border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 rounded-2xl p-4 text-center cursor-pointer flex flex-col items-center justify-center gap-1 select-none"
+                  >
+                    <input 
+                      type="file" 
+                      ref={reelFileInputRef}
+                      className="hidden" 
+                      accept="video/*"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          const file = e.target.files[0];
+                          setReelFile(file);
+                          
+                          // Set preview URL
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            if (event.target?.result) {
+                              setVideoUrl(event.target.result as string);
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                    <span className="text-xs font-black text-slate-700">Tap to browse video from gallery</span>
+                    <span className="text-[10px] text-slate-400 font-semibold">Supports MP4, MOV format</span>
+                  </div>
+
+                  {reelFile && (
+                    <div className="text-xs text-cyan-600 font-extrabold flex items-center justify-between bg-cyan-50/60 p-2 rounded-xl mt-1 border border-cyan-100">
+                      <span className="truncate">📎 {reelFile.name}</span>
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setReelFile(null);
+                          setVideoUrl('');
+                        }}
+                        className="text-slate-500 hover:text-red-500 font-black px-1.5"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+
                   <input 
                     type="url"
                     placeholder="https://example.com/custom_video.mp4"
-                    value={videoUrl}
+                    value={reelFile ? '' : videoUrl}
+                    disabled={!!reelFile}
                     onChange={(e) => setVideoUrl(e.target.value)}
                     className="w-full p-3.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-cyan-500 bg-slate-50"
                   />
@@ -312,9 +378,10 @@ export default function ShortsView() {
 
                 <button 
                   type="submit"
-                  className="w-full py-4 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-pink-200/50 mt-1 cursor-pointer transition-all hover:translate-y-[-1px]"
+                  disabled={reelUploadLoading}
+                  className="w-full py-4 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-pink-200/50 mt-1 cursor-pointer transition-all hover:translate-y-[-1px] disabled:opacity-50"
                 >
-                  Publish Campus Short ✨
+                  {reelUploadLoading ? 'Uploading Short Video...' : 'Publish Campus Short ✨'}
                 </button>
               </form>
             </motion.div>

@@ -5,6 +5,7 @@
 
 import { useSocial } from '../context/SocialContext';
 import { motion } from 'motion/react';
+import Logo from './Logo';
 
 export default function WelcomeView() {
   const { setOnboardingStep, loginWithGoogle, enableMockBypass } = useSocial();
@@ -24,15 +25,10 @@ export default function WelcomeView() {
           animate={{ scale: 1, opacity: 1 }}
           className="flex flex-col items-center text-center mb-12"
         >
-          <div className="relative flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br from-cyan-400 to-sky-600 shadow-xl shadow-cyan-300/40 mb-6">
-            <span className="text-white text-5xl font-sans font-bold">C</span>
-          </div>
+          <Logo size="lg" className="mb-4" />
           
-          <h2 className="text-4xl font-black text-slate-800 tracking-tight">
-            Let's
-          </h2>
-          <p className="text-slate-400 text-sm font-medium mt-1">
-            Build your campus memory network
+          <p className="text-slate-400 text-sm font-medium mt-3">
+            Build your global social network
           </p>
         </motion.div>
 
@@ -85,7 +81,7 @@ export default function WelcomeView() {
           
           <button
             id="welcome-signup-btn"
-            onClick={() => setOnboardingStep('who-are-you')}
+            onClick={() => setOnboardingStep('signup')}
             className="w-full py-4 rounded-xl bg-slate-100 text-slate-700 font-extrabold hover:bg-slate-200/80 transition-colors cursor-pointer text-sm mb-1.5"
           >
             Create New Account
@@ -102,7 +98,7 @@ export default function WelcomeView() {
       </div>
 
       <div className="text-center py-4 text-xs text-slate-400 font-medium">
-        By joining, you agree to our Terms & Campus Community Rules
+        By joining, you agree to our Terms & Global Community Rules
       </div>
     </div>
   );

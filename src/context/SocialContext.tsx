@@ -5,13 +5,108 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
-  UserProfile, Post, Story, Comment, Conversation, Message, Notification, UserType, Reel 
+  UserProfile, Post, Story, Comment, Conversation, Message, Notification, UserType, Reel, UserActivity
 } from '../types';
 import { 
   INITIAL_USERS, INITIAL_POSTS, INITIAL_STORIES, INITIAL_COMMENTS, 
   INITIAL_CONVERSATIONS, INITIAL_MESSAGES, INITIAL_NOTIFICATIONS 
 } from '../services/mockData';
-import { db, auth, isFirebaseMock as originalIsFirebaseMock } from '../firebase';
+import { db, auth, storage, isFirebaseMock as originalIsFirebaseMock } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
+const INITIAL_ACTIVITIES: UserActivity[] = [
+  {
+    id: 'activity-1',
+    userId: 'clara-uid',
+    fullName: 'Clara Hughes',
+    username: 'clara_h',
+    profilePhoto: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&h=150&q=80',
+    activityType: 'signup',
+    activityDetails: 'joined Tijunction, verified under Creative Writing & Arts 🎨',
+    targetId: '',
+    createdAt: new Date(Date.now() - 15 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'activity-2',
+    userId: 'clara-uid',
+    fullName: 'Clara Hughes',
+    username: 'clara_h',
+    profilePhoto: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&h=150&q=80',
+    activityType: 'create_post',
+    activityDetails: 'posted a new campus memory: "Sunset over the Brooklyn quad... feeling inspired." 🌸',
+    targetId: 'post-1',
+    createdAt: new Date(Date.now() - 45 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'activity-3',
+    userId: 'jacob-uid',
+    fullName: 'Jacob Washington',
+    username: 'jacob_wash',
+    profilePhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80',
+    activityType: 'create_reel',
+    activityDetails: 'uploaded a coding reel: "Late night coding session for the student memory network!" 💻☕',
+    targetId: 'reel-2',
+    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'activity-4',
+    userId: 'marcus-uid',
+    fullName: 'Marcus Thorne',
+    username: 'marcus_t',
+    profilePhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80',
+    activityType: 'like_post',
+    activityDetails: 'liked memory "Autumn vibes in Brooklyn" shared by Clara Hughes ❤️',
+    targetId: 'post-2',
+    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
+  }
+];
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
@@ -42,22 +137,22 @@ interface SocialContextProps {
   setDarkMode: React.Dispatch<React.SetStateAction<boolean>>;
   isFirebaseMock: boolean;
   enableMockBypass: () => void;
-  activeTab: 'home' | 'search' | 'create' | 'chat' | 'alerts' | 'profile' | 'settings' | 'shorts';
-  setActiveTab: React.Dispatch<React.SetStateAction<'home' | 'search' | 'create' | 'chat' | 'alerts' | 'profile' | 'settings' | 'shorts'>>;
+  activeTab: 'home' | 'search' | 'create' | 'chat' | 'alerts' | 'profile' | 'settings' | 'shorts' | 'menu';
+  setActiveTab: React.Dispatch<React.SetStateAction<'home' | 'search' | 'create' | 'chat' | 'alerts' | 'profile' | 'settings' | 'shorts' | 'menu'>>;
   reels: Reel[];
   createReel: (videoUrl: string, caption: string) => Promise<void>;
   toggleLikeReel: (reelId: string) => Promise<void>;
   
   // Auth & Onboarding Flow States and actions
-  pendingAuthUser: { email: string; fullName: string; username: string; userType: UserType; password?: string } | null;
+  pendingAuthUser: { email: string; fullName: string; username: string; userType: UserType; age?: number; password?: string } | null;
   onboardingStep: 'splash' | 'slides' | 'welcome' | 'who-are-you' | 'signup' | 'verify-email' | 'congrats-email' | 'edu-setup' | 'verify-institute' | 'signin' | 'forgot-password' | 'verify-code' | 'reset-password' | 'success-reset' | 'app';
   setOnboardingStep: (step: any) => void;
   setPendingAuthUser: (user: any) => void;
   
   // Auth Operations
-  login: (email: string, password: string) => Promise<void>;
+  login: (usernameOrEmail: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
-  signup: (email: string, password: string, fullName: string, username: string, userType: UserType) => Promise<void>;
+  signup: (email: string, password: string, fullName: string, username: string, userType: UserType, age: number) => Promise<void>;
   verifyEmailCode: (code: string) => Promise<void>;
   completeEducation: (country: string, institute: string, degree: string) => Promise<void>;
   submitInstituteVerification: (regNo: string, photoUrl: string) => Promise<void>;
@@ -94,8 +189,12 @@ interface SocialContextProps {
   // Story Operations
   createStory: (mediaUrl: string, mediaType: 'image' | 'video') => Promise<void>;
 
+  // Media Uploads
+  uploadMediaFile: (file: File, folder?: string) => Promise<string>;
+
   // Administrative / Moderation list
   reports: any[];
+  userActivities: UserActivity[];
 }
 
 const SocialContext = createContext<SocialContextProps | undefined>(undefined);
@@ -167,13 +266,18 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [userActivities, setUserActivities] = useState<UserActivity[]>(() => {
+    const saved = localStorage.getItem('collegio_user_activities');
+    return saved ? JSON.parse(saved) : INITIAL_ACTIVITIES;
+  });
+
   // Current logged in profile state
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
     const saved = localStorage.getItem('collegio_curr_user');
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [activeTab, setActiveTab] = useState<'home' | 'search' | 'create' | 'chat' | 'alerts' | 'profile' | 'settings' | 'shorts'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'search' | 'create' | 'chat' | 'alerts' | 'profile' | 'settings' | 'shorts' | 'menu'>('home');
 
   const [reels, setReels] = useState<Reel[]>(() => {
     const saved = localStorage.getItem('collegio_reels');
@@ -499,7 +603,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
   // Local state to track running mock override (e.g. if authentication provider is disabled)
   const [isFirebaseMock, setIsFirebaseMock] = useState(() => {
-    return originalIsFirebaseMock || localStorage.getItem('collegio_force_mock') === 'true';
+    return originalIsFirebaseMock;
   });
 
   const enableMockBypass = () => {
@@ -509,6 +613,40 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     const target = users.find(u => u.username === 'clara_h') || users[0] || INITIAL_USERS[0];
     setCurrentUser(target);
     setOnboardingStep('app');
+  };
+
+  const logActivity = async (
+    userId: string,
+    fullName: string,
+    username: string,
+    profilePhoto: string,
+    activityType: 'signup' | 'login' | 'create_post' | 'delete_post' | 'like_post' | 'add_comment' | 'follow' | 'unfollow' | 'send_message' | 'create_story' | 'create_reel',
+    activityDetails: string,
+    targetId?: string
+  ) => {
+    const activityId = 'activity-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
+    const newActivity: UserActivity = {
+      id: activityId,
+      userId,
+      fullName,
+      username,
+      profilePhoto: profilePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80',
+      activityType,
+      activityDetails,
+      targetId: targetId || '',
+      createdAt: new Date().toISOString()
+    };
+
+    // Prepend to local list
+    setUserActivities(prev => [newActivity, ...prev]);
+
+    if (!isFirebaseMock) {
+      try {
+        await setDoc(doc(db, 'userActivities', activityId), newActivity);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, `userActivities/${activityId}`);
+      }
+    }
   };
 
   // Sync to localStorage
@@ -559,6 +697,10 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem('collegio_reports', JSON.stringify(reports));
   }, [reports]);
+
+  useEffect(() => {
+    localStorage.setItem('collegio_user_activities', JSON.stringify(userActivities));
+  }, [userActivities]);
 
   useEffect(() => {
     localStorage.setItem('collegio_dark_mode', String(darkMode));
@@ -614,6 +756,81 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isFirebaseMock || !currentUser) return;
 
+    // Real-time Users Listener with automatic DB seeder fallback
+    const usersQuery = query(collection(db, 'users'));
+    const unsubscribeUsers = onSnapshot(usersQuery, async (snapshot) => {
+      const fetchedUsers: UserProfile[] = [];
+      snapshot.forEach(docSnap => {
+        fetchedUsers.push({ uid: docSnap.id, ...docSnap.data() } as UserProfile);
+      });
+      
+      if (fetchedUsers.length === 0) {
+        console.log("Empty users collection detected. Seeding Firestore with real initial data so there are no mock placeholders.");
+        try {
+          // 1. Seed users
+          for (const u of INITIAL_USERS) {
+            await setDoc(doc(db, 'users', u.uid), u);
+          }
+          // 2. Seed posts
+          for (const p of INITIAL_POSTS) {
+            await setDoc(doc(db, 'posts', p.id), p);
+          }
+          // 3. Seed stories
+          for (const s of INITIAL_STORIES) {
+            await setDoc(doc(db, 'stories', s.id), s);
+          }
+          // 4. Seed comments
+          for (const c of INITIAL_COMMENTS) {
+            await setDoc(doc(db, 'comments', c.id), c);
+          }
+          // 5. Seed conversations
+          for (const conv of INITIAL_CONVERSATIONS) {
+            await setDoc(doc(db, 'conversations', conv.id), conv);
+          }
+          // 6. Seed notifications
+          for (const n of INITIAL_NOTIFICATIONS) {
+            await setDoc(doc(db, 'notifications', n.id), n);
+          }
+          // 7. Seed reels
+          const defaultReels = [
+            {
+              id: 'reel-1',
+              userId: 'kat-uid',
+              fullName: 'Kat Williams',
+              username: 'kat_design',
+              profilePhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80',
+              videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-undergrad-students-walking-on-school-campus-41618-large.mp4',
+              caption: 'Walking around the campus quad today! The weather is absolutely perfect ☀️🎓 #brooklyncollege #collegelife',
+              likesCount: 1450,
+              commentsCount: 22,
+              createdAt: new Date(Date.now() - 3 * 3600000).toISOString()
+            },
+            {
+              id: 'reel-2',
+              userId: 'jacob-uid',
+              fullName: 'Jacob Washington',
+              username: 'jacob_wash',
+              profilePhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80',
+              videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-young-woman-with-vr-goggles-playing-video-game-41648-large.mp4',
+              caption: 'Trying out the new VR sandbox software we built in the labs today! Totally immersive 💻🕹️ #vr #coding #sandbox',
+              likesCount: 2845,
+              commentsCount: 56,
+              createdAt: new Date(Date.now() - 6 * 3600000).toISOString()
+            }
+          ];
+          for (const r of defaultReels) {
+            await setDoc(doc(db, 'reels', r.id), r);
+          }
+        } catch (seedErr) {
+          console.error("Error seeding Firestore:", seedErr);
+        }
+      } else {
+        setUsers(fetchedUsers);
+      }
+    }, (error) => {
+      console.error("Error reading users list:", error);
+    });
+
     // Real-time Feed Listener
     const postsQuery = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
     const unsubscribePosts = onSnapshot(postsQuery, (snapshot) => {
@@ -621,7 +838,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       snapshot.forEach(docSnap => {
         fetchedPosts.push({ id: docSnap.id, ...docSnap.data() } as Post);
       });
-      setPosts(fetchedPosts.length > 0 ? fetchedPosts : INITIAL_POSTS);
+      setPosts(fetchedPosts);
+    }, (error) => {
+      console.error("Error fetching posts:", error);
     });
 
     // Real-time Stories Listener (filters out older than 24h)
@@ -636,6 +855,44 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         }
       });
       setStories(activeStories);
+    }, (error) => {
+      console.error("Error reading stories:", error);
+    });
+
+    // Real-time Comments Listener
+    const commentsQuery = query(collection(db, 'comments'), orderBy('createdAt', 'desc'));
+    const unsubscribeComments = onSnapshot(commentsQuery, (snapshot) => {
+      const fetchedComments: Comment[] = [];
+      snapshot.forEach(docSnap => {
+        fetchedComments.push({ id: docSnap.id, ...docSnap.data() } as Comment);
+      });
+      setComments(fetchedComments);
+    }, (error) => {
+      console.error("Error fetching comments:", error);
+    });
+
+    // Real-time Likes Listener
+    const likesQuery = query(collection(db, 'likes'));
+    const unsubscribeLikes = onSnapshot(likesQuery, (snapshot) => {
+      const fetchedLikes: any[] = [];
+      snapshot.forEach(docSnap => {
+        fetchedLikes.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setLikes(fetchedLikes);
+    }, (error) => {
+      console.error("Error fetching likes:", error);
+    });
+
+    // Real-time Followers Listener
+    const followersQuery = query(collection(db, 'followers'));
+    const unsubscribeFollowers = onSnapshot(followersQuery, (snapshot) => {
+      const fetchedFollows: any[] = [];
+      snapshot.forEach(docSnap => {
+        fetchedFollows.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setFollows(fetchedFollows);
+    }, (error) => {
+      console.error("Error fetching followers:", error);
     });
 
     // Real-time Notifications Listener
@@ -650,6 +907,8 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         list.push({ id: docSnap.id, ...docSnap.data() } as Notification);
       });
       setNotifications(list);
+    }, (error) => {
+      console.error("Error reading notifications:", error);
     });
 
     // Conversations Listener
@@ -663,6 +922,8 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         list.push({ id: docSnap.id, ...docSnap.data() } as Conversation);
       });
       setConversations(list);
+    }, (error) => {
+      console.error("Error reading conversations:", error);
     });
 
     // Real-time Reels Listener
@@ -672,17 +933,34 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       snapshot.forEach(docSnap => {
         fetchedReels.push({ id: docSnap.id, ...docSnap.data() } as Reel);
       });
-      if (fetchedReels.length > 0) {
-        setReels(fetchedReels);
-      }
+      setReels(fetchedReels);
+    }, (error) => {
+      console.error("Error fetching reels:", error);
+    });
+
+    // Real-time User Activities Listener
+    const activitiesQuery = query(collection(db, 'userActivities'), orderBy('createdAt', 'desc'));
+    const unsubscribeActivities = onSnapshot(activitiesQuery, (snapshot) => {
+      const fetchedActivities: UserActivity[] = [];
+      snapshot.forEach(docSnap => {
+        fetchedActivities.push({ id: docSnap.id, ...docSnap.data() } as UserActivity);
+      });
+      setUserActivities(fetchedActivities.length > 0 ? fetchedActivities : INITIAL_ACTIVITIES);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'userActivities');
     });
 
     return () => {
+      unsubscribeUsers();
       unsubscribePosts();
       unsubscribeStories();
+      unsubscribeComments();
+      unsubscribeLikes();
+      unsubscribeFollowers();
       unsubscribeNotifs();
       unsubscribeConv();
       unsubscribeReels();
+      unsubscribeActivities();
     };
   }, [currentUser]);
 
@@ -695,8 +973,10 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         const cred = await signInWithPopup(auth, provider);
         const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
         if (userDoc.exists()) {
-          setCurrentUser(userDoc.data() as UserProfile);
+          const profile = userDoc.data() as UserProfile;
+          setCurrentUser(profile);
           setOnboardingStep('app');
+          logActivity(profile.uid, profile.fullName, profile.username, profile.profilePhoto, 'login', 'logged in securely via Google Sign-In 🚀');
         } else {
           // Create default profile for Google user in Firestore
           const newProfile: UserProfile = {
@@ -725,12 +1005,14 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
           await setDoc(doc(db, 'users', cred.user.uid), newProfile);
           setCurrentUser(newProfile);
           setOnboardingStep('app');
+          logActivity(newProfile.uid, newProfile.fullName, newProfile.username, newProfile.profilePhoto, 'signup', 'registered a new academic account via Google Sign-In 🎓');
         }
       } else {
         // Mock Google Login as Clara
         const target = users.find(u => u.username === 'clara_h') || users[0] || INITIAL_USERS[0];
         setCurrentUser(target);
         setOnboardingStep('app');
+        logActivity(target.uid, target.fullName, target.username, target.profilePhoto, 'login', 'logged in securely via Google Sign-In [Mock] 🚀');
       }
     } catch (err: any) {
       throw new Error(err.message || "Failed to sign in with Google.");
@@ -739,26 +1021,46 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const login = async (email: string, password: string) => {
+  const login = async (usernameOrEmail: string, password: string) => {
     setIsLoading(true);
     try {
       if (!isFirebaseMock) {
-        const cred = await signInWithEmailAndPassword(auth, email, password);
+        let emailToUse = usernameOrEmail.trim();
+        if (!emailToUse.includes('@')) {
+          // It's a username, query the users collection
+          const usersRef = collection(db, 'users');
+          const q = query(usersRef, where('username', '==', emailToUse.toLowerCase()));
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0];
+            emailToUse = userDoc.data().email;
+          } else {
+            throw new Error(`Username "${usernameOrEmail}" was not found.`);
+          }
+        }
+        
+        const cred = await signInWithEmailAndPassword(auth, emailToUse, password);
         const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
         if (userDoc.exists()) {
-          setCurrentUser(userDoc.data() as UserProfile);
+          const profile = userDoc.data() as UserProfile;
+          setCurrentUser(profile);
           setOnboardingStep('app');
+          logActivity(profile.uid, profile.fullName, profile.username, profile.profilePhoto, 'login', 'logged in securely under registered profile 🔐');
         } else {
           throw new Error("No database user record exists.");
         }
       } else {
         // Mock Auth
-        const existing = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+        const existing = users.find(u => 
+          u.email.toLowerCase() === usernameOrEmail.toLowerCase().trim() ||
+          u.username.toLowerCase() === usernameOrEmail.toLowerCase().trim()
+        );
         if (!existing) {
-          throw new Error("Sorry, this credentials does not exist. Please check your credentials or sign up!");
+          throw new Error("Sorry, these credentials do not exist. Please check your credentials or sign up!");
         }
         setCurrentUser(existing);
         setOnboardingStep('app');
+        logActivity(existing.uid, existing.fullName, existing.username, existing.profilePhoto, 'login', 'logged in securely under registered profile [Mock] 🔐');
       }
     } catch (err: any) {
       if (err.code === 'auth/operation-not-allowed' || (err.message && err.message.includes('operation-not-allowed'))) {
@@ -770,11 +1072,11 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signup = async (email: string, password: string, fullName: string, username: string, userType: UserType) => {
+  const signup = async (email: string, password: string, fullName: string, username: string, userType: UserType, age: number) => {
     setIsLoading(true);
     try {
       // Setup temporary state for onboarding sequence
-      setPendingAuthUser({ email, password, fullName, username, userType });
+      setPendingAuthUser({ email, password, fullName, username, userType, age });
       // Proceed to verification slide (Verify Email code input)
       setOnboardingStep('verify-email');
     } catch (err: any) {
@@ -817,16 +1119,16 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     if (!pendingAuthUser) throw new Error("Missing credentials payload.");
     setIsLoading(true);
     try {
-      const finalPhoto = photoUrl || 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=400&q=80';
+      const finalPhoto = photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&h=400&q=80';
       
       const newProfile: UserProfile = {
         uid: Date.now().toString(),
         fullName: pendingAuthUser.fullName,
         username: pendingAuthUser.username.toLowerCase(),
         email: pendingAuthUser.email,
-        bio: `${pendingAuthUser.userType === 'student' ? 'Student' : pendingAuthUser.userType === 'teacher' ? 'Lecturer' : 'Representative'} from ${pendingAuthUser.instituteName || 'Collegio University'}!`,
+        bio: `${pendingAuthUser.userType === 'student' ? 'Individual' : pendingAuthUser.userType === 'teacher' ? 'Creator' : 'Business'} account passionate about ${pendingAuthUser.instituteName || 'general exploration'} • Tag: ${pendingAuthUser.degreeOrSubject || 'Creative Writing & Arts'}!`,
         userType: pendingAuthUser.userType,
-        profilePhoto: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80',
+        profilePhoto: finalPhoto,
         coverPhoto: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=800&h=300&q=80',
         website: '',
         location: pendingAuthUser.instituteCountry || 'United States',
@@ -835,6 +1137,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         postsCount: 0,
         verified: true,
         createdAt: new Date().toISOString(),
+        age: pendingAuthUser.age,
         instituteCountry: pendingAuthUser.instituteCountry,
         instituteName: pendingAuthUser.instituteName,
         degreeOrSubject: pendingAuthUser.degreeOrSubject,
@@ -863,6 +1166,14 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       setCurrentUser(newProfile);
       setPendingAuthUser(null);
       setOnboardingStep('app');
+      logActivity(
+        newProfile.uid,
+        newProfile.fullName,
+        newProfile.username,
+        newProfile.profilePhoto,
+        'signup',
+        `joined the global platform! Profile verified under interest category '${newProfile.degreeOrSubject || 'Creative Writing & Arts'}' 🌍`
+      );
     } catch (err: any) {
       throw new Error(err.message || "Registration write failed.");
     } finally {
@@ -986,8 +1297,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     if (!currentUser) return;
     setIsLoading(true);
     try {
+      const newPostId = 'post-' + Date.now();
       const newPost: Post = {
-        id: 'post-' + Date.now(),
+        id: newPostId,
         userId: currentUser.uid,
         fullName: currentUser.fullName,
         username: currentUser.username,
@@ -1016,8 +1328,21 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         } : u));
         setCurrentUser(prev => prev ? { ...prev, postsCount: (prev.postsCount || 0) + 1 } : null);
       }
+
+      logActivity(
+        currentUser.uid,
+        currentUser.fullName,
+        currentUser.username,
+        currentUser.profilePhoto,
+        'create_post',
+        `shared a new memory: "${newPost.text.length > 50 ? newPost.text.slice(0, 50) + '...' : newPost.text}" 🌸`,
+        newPost.id
+      );
     } catch (err) {
       console.error(err);
+      if (!isFirebaseMock) {
+        handleFirestoreError(err, OperationType.CREATE, 'posts');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -1272,9 +1597,23 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       } else {
         setStories(prev => [newStory, ...prev]);
       }
+      
+      logActivity(
+        currentUser.uid,
+        currentUser.fullName,
+        currentUser.username,
+        currentUser.profilePhoto,
+        'create_story',
+        'added a new campus daily story! 📸',
+        newStory.id
+      );
+      
       alert("Story shared successfully!");
     } catch (err) {
       console.error(err);
+      if (!isFirebaseMock) {
+        handleFirestoreError(err, OperationType.CREATE, 'stories');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -1304,11 +1643,53 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       }
       // Re-add to local state to allow instant feedback
       setReels(prev => [newReel, ...prev]);
+
+      logActivity(
+        currentUser.uid,
+        currentUser.fullName,
+        currentUser.username,
+        currentUser.profilePhoto,
+        'create_reel',
+        `uploaded an interactive campus short: "${newReel.caption.length > 50 ? newReel.caption.slice(0, 50) + '...' : newReel.caption}" 🎬✨`,
+        newReel.id
+      );
+      
       alert("Short video uploaded successfully! 🎉");
     } catch (err) {
       console.error(err);
+      if (!isFirebaseMock) {
+        handleFirestoreError(err, OperationType.CREATE, 'reels');
+      }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const uploadMediaFile = async (file: File, folder: string = 'posts'): Promise<string> => {
+    if (isFirebaseMock) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          resolve(e.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    try {
+      const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      const fileRef = ref(storage, `${folder}/${currentUser?.uid || 'anonymous'}/${fileName}`);
+      const snapshot = await uploadBytes(fileRef, file);
+      const downloadUrl = await getDownloadURL(snapshot.ref);
+      return downloadUrl;
+    } catch (err) {
+      console.warn("Firebase Storage upload failed or not configured, falling back to base64 data URL:", err);
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          resolve(e.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+      });
     }
   };
 
@@ -1649,7 +2030,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       isSavedPost,
 
       createStory,
-      reports
+      uploadMediaFile,
+      reports,
+      userActivities
     }}>
       {children}
     </SocialContext.Provider>

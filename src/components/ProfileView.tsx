@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useSocial } from '../context/SocialContext';
 import { UserProfile } from '../types';
 import { 
@@ -30,7 +30,8 @@ export default function ProfileView({ altTargetUid, onClearTarget, openSettingsT
     followUser,
     unfollowUser,
     reports,
-    deletePost
+    deletePost,
+    uploadMediaFile
   } = useSocial();
 
   const [activeTab, setActiveTab] = useState<'memories' | 'stories' | 'saved' | 'admin'>('memories');
@@ -43,6 +44,11 @@ export default function ProfileView({ altTargetUid, onClearTarget, openSettingsT
   const [editLocation, setEditLocation] = useState(currentUser?.location || '');
   const [editProfilePhoto, setEditProfilePhoto] = useState(currentUser?.profilePhoto || '');
   const [editCoverPhoto, setEditCoverPhoto] = useState(currentUser?.coverPhoto || '');
+
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
 
   // Select target: ourselves, or another student
   const profileUser: UserProfile = altTargetUid 
@@ -463,23 +469,91 @@ export default function ProfileView({ altTargetUid, onClearTarget, openSettingsT
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-slate-400 block mb-1">Avatar Profile Photo URL</label>
-                  <input 
-                    type="url" 
-                    value={editProfilePhoto}
-                    onChange={(e) => setEditProfilePhoto(e.target.value)}
-                    className="w-full p-3 border border-slate-200 rounded-xl text-xs font-semibold"
-                  />
+                  <label className="text-xs font-bold text-slate-400 block mb-1">Avatar Profile Photo</label>
+                  <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    {editProfilePhoto && (
+                      <img src={editProfilePhoto} alt="Avatar Preview" className="w-10 h-10 rounded-full object-cover border border-cyan-100" referrerPolicy="no-referrer" />
+                    )}
+                    <input 
+                      type="file" 
+                      ref={avatarInputRef}
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setAvatarUploading(true);
+                           try {
+                             const url = await uploadMediaFile(e.target.files[0], 'avatars');
+                             setEditProfilePhoto(url);
+                           } catch (err) {
+                             console.error(err);
+                             alert("Failed to upload avatar.");
+                           } finally {
+                             setAvatarUploading(false);
+                           }
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={avatarUploading}
+                      onClick={() => avatarInputRef.current?.click()}
+                      className="px-3 py-1.5 bg-white border border-slate-200 hover:border-cyan-400 hover:text-cyan-600 text-slate-600 text-[10px] font-black rounded-lg uppercase tracking-wider transition-colors disabled:opacity-50"
+                    >
+                      {avatarUploading ? 'Uploading...' : 'Upload Image'}
+                    </button>
+                    <input 
+                      type="url" 
+                      placeholder="Or paste profile photo URL"
+                      value={editProfilePhoto}
+                      onChange={(e) => setEditProfilePhoto(e.target.value)}
+                      className="flex-1 p-2 border border-slate-200 rounded-lg text-[10px] font-semibold bg-white outline-none focus:border-cyan-400"
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-slate-400 block mb-1">Portfolio Cover Banner URL</label>
-                  <input 
-                    type="url" 
-                    value={editCoverPhoto}
-                    onChange={(e) => setEditCoverPhoto(e.target.value)}
-                    className="w-full p-3 border border-slate-200 rounded-xl text-xs font-semibold"
-                  />
+                  <label className="text-xs font-bold text-slate-400 block mb-1">Portfolio Cover Banner</label>
+                  <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    {editCoverPhoto && (
+                      <img src={editCoverPhoto} alt="Cover Preview" className="w-14 h-8 rounded-lg object-cover border border-cyan-100" referrerPolicy="no-referrer" />
+                    )}
+                    <input 
+                      type="file" 
+                      ref={coverInputRef}
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setCoverUploading(true);
+                           try {
+                             const url = await uploadMediaFile(e.target.files[0], 'covers');
+                             setEditCoverPhoto(url);
+                           } catch (err) {
+                             console.error(err);
+                             alert("Failed to upload cover banner.");
+                           } finally {
+                             setCoverUploading(false);
+                           }
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={coverUploading}
+                      onClick={() => coverInputRef.current?.click()}
+                      className="px-3 py-1.5 bg-white border border-slate-200 hover:border-cyan-400 hover:text-cyan-600 text-slate-600 text-[10px] font-black rounded-lg uppercase tracking-wider transition-colors disabled:opacity-50"
+                    >
+                      {coverUploading ? 'Uploading...' : 'Upload Image'}
+                    </button>
+                    <input 
+                      type="url" 
+                      placeholder="Or paste cover URL"
+                      value={editCoverPhoto}
+                      onChange={(e) => setEditCoverPhoto(e.target.value)}
+                      className="flex-1 p-2 border border-slate-200 rounded-lg text-[10px] font-semibold bg-white outline-none focus:border-cyan-400"
+                    />
+                  </div>
                 </div>
 
                 <button 

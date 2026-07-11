@@ -15,7 +15,10 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-export default function SettingsView() {
+export default function SettingsView(props?: {
+  activeSubView?: string | null;
+  setActiveSubView?: (view: string | null) => void;
+}) {
   const {
     currentUser,
     users,
@@ -35,7 +38,9 @@ export default function SettingsView() {
   } = useSocial();
 
   // Navigation State
-  const [activeSubView, setActiveSubView] = useState<string | null>(null);
+  const [localActiveSubView, setLocalActiveSubView] = useState<string | null>(null);
+  const activeSubView = props?.activeSubView !== undefined ? props.activeSubView : localActiveSubView;
+  const setActiveSubView = props?.setActiveSubView !== undefined ? props.setActiveSubView : setLocalActiveSubView;
 
   // Search input for main menu search icon
   const [showSearchBox, setShowSearchBox] = useState(false);
@@ -1529,17 +1534,17 @@ export default function SettingsView() {
               {/* MODULE 19: ABOUT SYSTEM */}
               {activeSubView === 'about' && (
                 <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center gap-4">
-                  <div className="w-12 h-12 bg-cyan-500 text-white font-black text-2xl flex items-center justify-center rounded-3xl shadow-md">
-                    C
+                  <div className="w-12 h-12 bg-cyan-500 text-white font-black text-xs flex items-center justify-center rounded-3xl shadow-md">
+                    Ti
                   </div>
                   <div>
-                    <h4 className="text-xs font-black">Collegio Academic Social Network</h4>
+                    <h4 className="text-xs font-black">Ti Connect Global Social Network</h4>
                     <span className="text-[9px] bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100 text-slate-400 font-black mt-1 inline-block">
                       v2.4.0 (Stable Production)
                     </span>
                   </div>
                   <p className="text-[10px] text-slate-500 font-semibold leading-relaxed max-w-xs">
-                    Collegio is a student social environment running high-integrity connections designed exclusively for verified college cohorts, clubs, events, and textbook marketplaces.
+                    Ti Connect is a professional global social network running high-integrity connections designed for verified individuals, creators, organizations and marketplaces.
                   </p>
                   <p className="text-[9px] text-slate-400 font-bold">
                     Running safely on Cloud, FireStore & React.
@@ -1640,7 +1645,7 @@ export default function SettingsView() {
                       <span>{currentUser?.fullName || 'David Ojukwu'}</span>
                       {currentUser?.verified && <CheckCircle className="w-4 h-4 text-cyan-500 fill-cyan-50" />}
                     </h3>
-                    <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-tight">View your student profile</p>
+                    <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-tight">View your public profile</p>
                   </div>
                 </div>
                 <span className="text-sm font-black text-slate-400">→</span>
@@ -1649,18 +1654,18 @@ export default function SettingsView() {
               {/* TWO COLUMN GRID SHORT-CUTS */}
               <div className="grid grid-cols-2 gap-2.5">
                 {[
-                  { id: 'chat-shortcut', label: 'Messages', desc: 'Active student chats', icon: MessageCircle, color: 'bg-indigo-50 text-indigo-500 border-indigo-100', action: () => setActiveTab('chat') },
-                  { id: 'groups-shortcut', label: 'Groups', desc: 'Join academic study circles', icon: Users, color: 'bg-sky-50 text-sky-500 border-sky-100', action: () => setActiveSubView('groups') },
-                  { id: 'friends-shortcut', label: 'Friends', desc: 'Follow class cohorts', icon: User, color: 'bg-emerald-50 text-emerald-500 border-emerald-100', action: () => setActiveSubView('friends') },
+                  { id: 'chat-shortcut', label: 'Messages', desc: 'Active personal chats', icon: MessageCircle, color: 'bg-indigo-50 text-indigo-500 border-indigo-100', action: () => setActiveTab('chat') },
+                  { id: 'groups-shortcut', label: 'Groups', desc: 'Join community circles', icon: Users, color: 'bg-sky-50 text-sky-500 border-sky-100', action: () => setActiveSubView('groups') },
+                  { id: 'friends-shortcut', label: 'Friends', desc: 'Follow search connections', icon: User, color: 'bg-emerald-50 text-emerald-500 border-emerald-100', action: () => setActiveSubView('friends') },
                   { id: 'shorts-shortcut', label: 'Reels', desc: 'Watch vertical video shorts', icon: Video, color: 'bg-pink-50 text-pink-500 border-pink-100', action: () => setActiveTab('shorts') },
-                  { id: 'market-shortcut', label: 'Marketplace', desc: 'Buy & sell peer textbooks', icon: ShoppingBag, color: 'bg-emerald-5 w-auto text-emerald-600 border-emerald-100', action: () => setActiveSubView('marketplace') },
-                  { id: 'pages-shortcut', label: 'Pages', desc: 'Discover campus guilds', icon: Flag, color: 'bg-orange-50 text-orange-500 border-orange-100', action: () => setActiveSubView('pages') },
+                  { id: 'market-shortcut', label: 'Marketplace', desc: 'Buy & sell peer listings', icon: ShoppingBag, color: 'bg-emerald-5 w-auto text-emerald-600 border-emerald-100', action: () => setActiveSubView('marketplace') },
+                  { id: 'pages-shortcut', label: 'Pages', desc: 'Discover community guilds', icon: Flag, color: 'bg-orange-50 text-orange-500 border-orange-100', action: () => setActiveSubView('pages') },
                   { id: 'saved-shortcut', label: 'Saved', desc: 'Bookmarked board posts', icon: Bookmark, color: 'bg-purple-50 text-purple-500 border-purple-100', action: () => setActiveSubView('saved') },
                   { id: 'memories-shortcut', label: 'Memories', desc: 'Past history timeline', icon: RefreshCw, color: 'bg-blue-50 text-blue-500 border-blue-100', action: () => setActiveSubView('memories') },
                   { id: 'bdays-shortcut', label: 'Birthdays', desc: 'Float balloon greetings', icon: Gift, color: 'bg-rose-50 text-rose-500 border-rose-100', action: () => setActiveSubView('birthdays') },
-                  { id: 'events-shortcut', label: 'Events', desc: 'Campus RSVP calendars', icon: Calendar, color: 'bg-cyan-50 text-cyan-500 border-cyan-100', action: () => setActiveSubView('events') },
-                  { id: 'games-shortcut', label: 'Games', desc: 'Pop GPA F grade arcade', icon: Gamepad, color: 'bg-violet-50 text-violet-500 border-violet-100', action: () => setActiveSubView('games') },
-                  { id: 'ads-shortcut', label: 'Ads Manager', desc: 'Promote student flyerships', icon: Award, color: 'bg-pink-50 text-pink-600 border-pink-100', action: () => setActiveSubView('ads-manager') },
+                  { id: 'events-shortcut', label: 'Events', desc: 'Global RSVP calendars', icon: Calendar, color: 'bg-cyan-50 text-cyan-500 border-cyan-100', action: () => setActiveSubView('events') },
+                  { id: 'games-shortcut', label: 'Games', desc: 'Pop custom bubble arcade', icon: Gamepad, color: 'bg-violet-50 text-violet-500 border-violet-100', action: () => setActiveSubView('games') },
+                  { id: 'ads-shortcut', label: 'Ads Manager', desc: 'Promote global flyerships', icon: Award, color: 'bg-pink-50 text-pink-600 border-pink-100', action: () => setActiveSubView('ads-manager') },
                   { id: 'mobile-shortcut', label: 'Mobile Centre · Air...', desc: 'Internet speed diagnostic', icon: Radio, color: 'bg-slate-100 text-slate-500 border-slate-200', action: () => setActiveSubView('mobile-centre') },
                   { id: 'feeds-shortcut', label: 'Feeds', desc: 'Filter chrono feeds', icon: Rss, color: 'bg-amber-50 text-amber-500 border-amber-100', action: () => setActiveSubView('feeds') }
                 ]
