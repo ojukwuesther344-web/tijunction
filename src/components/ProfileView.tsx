@@ -122,7 +122,7 @@ export default function ProfileView({ altTargetUid, onClearTarget, openSettingsT
       </div>
 
       {/* Main profile stats block layout details */}
-      <div className="max-w-md mx-auto px-4 relative -mt-16 mb-4">
+      <div className="max-w-xl md:max-w-2xl mx-auto px-4 relative -mt-16 mb-4">
         <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100/60">
           <div className="flex justify-between items-end mb-4">
             {/* Circular picture layout details */}
@@ -222,7 +222,7 @@ export default function ProfileView({ altTargetUid, onClearTarget, openSettingsT
       </div>
 
       {/* Tabs navigation list panel details */}
-      <div className="max-w-md mx-auto px-2">
+      <div className="max-w-xl md:max-w-2xl mx-auto px-2">
         <div className="flex border-b border-slate-200 mb-4 bg-white rounded-2xl p-1 shadow-sm gap-1">
           <button 
             onClick={() => setActiveTab('memories')}

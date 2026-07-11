@@ -45,7 +45,7 @@ export default function SearchView() {
     <div className="flex-1 bg-slate-50 min-h-screen pb-24 text-slate-800">
       {/* Header bar with Search query */}
       <div className="sticky top-0 bg-white border-b border-slate-100 z-10 p-4 shadow-sm">
-        <div className="relative max-w-md mx-auto">
+        <div className="relative max-w-xl md:max-w-2xl mx-auto">
           <input 
             type="text" 
             placeholder="Search for students, subjects, posts..."
@@ -57,7 +57,7 @@ export default function SearchView() {
         </div>
 
         {/* Filter chips scrolling container */}
-        <div className="flex items-center gap-2 mt-4 overflow-x-auto scrollbar-none max-w-md mx-auto">
+        <div className="flex items-center gap-2 mt-4 overflow-x-auto scrollbar-none max-w-xl md:max-w-2xl mx-auto">
           {(['all', 'profiles', 'posts', 'institutes'] as const).map((chip) => (
             <button
               key={chip}
@@ -75,7 +75,7 @@ export default function SearchView() {
       </div>
 
       {/* Main Results body */}
-      <div className="max-w-md mx-auto w-full p-4 flex flex-col gap-4">
+      <div className="max-w-xl md:max-w-2xl mx-auto w-full p-4 flex flex-col gap-4">
         {/* Render profiles when relevant */}
         {activeChip !== 'posts' && (
           <div className="flex flex-col gap-3">

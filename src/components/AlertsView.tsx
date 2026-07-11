@@ -51,7 +51,7 @@ export default function AlertsView() {
       </header>
 
       {/* Main Alerts List */}
-      <main className="max-w-md mx-auto w-full p-4 flex flex-col gap-3">
+      <main className="max-w-xl md:max-w-2xl mx-auto w-full p-4 flex flex-col gap-3">
         {notifications.map((notif) => (
           <motion.div 
             key={notif.id}

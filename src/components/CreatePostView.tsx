@@ -128,7 +128,7 @@ export default function CreatePostView({ onComplete }: { onComplete: () => void 
       </header>
 
       {/* Form Content */}
-      <main className="max-w-md mx-auto w-full p-4">
+      <main className="max-w-xl md:max-w-2xl mx-auto w-full p-4">
         <form onSubmit={handlePostPublish} className="flex flex-col gap-4">
           
           {/* User profile identifier */}

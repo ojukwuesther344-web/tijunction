@@ -140,7 +140,7 @@ export default function HomeFeedView() {
   return (
     <div className="flex-1 bg-slate-50 min-h-screen pb-24 text-slate-800">
       {/* Main Container */}
-      <main className="max-w-md mx-auto w-full py-4 px-2">
+      <main className="max-w-xl md:max-w-2xl mx-auto w-full py-4 px-2">
 
         {/* UNIFIED CONTINUOUS VERTICAL FEED */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col gap-0">

@@ -147,7 +147,7 @@ export default function ChatView() {
             </header>
 
             {/* Conversation list */}
-            <div className="flex-1 p-3 overflow-y-auto w-full max-w-md mx-auto flex flex-col gap-2">
+            <div className="flex-1 p-3 overflow-y-auto w-full max-w-xl md:max-w-2xl mx-auto flex flex-col gap-2">
               {conversations.map(conv => {
                 const opponent = getOpponentUser(conv);
                 const convMsgs = messages[conv.id] || [];

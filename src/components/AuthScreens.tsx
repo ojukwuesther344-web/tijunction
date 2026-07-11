@@ -24,7 +24,9 @@ export default function AuthScreens() {
     resetPasswordRequest,
     performPasswordReset,
     enableMockBypass,
-    isFirebaseMock
+    isFirebaseMock,
+    generatedVerificationCode,
+    regenerateEmailCode
   } = useSocial();
 
   // Unified Error and Input states
@@ -401,6 +403,33 @@ export default function AuthScreens() {
               <span className="text-slate-800 font-bold font-mono">{pendingAuthUser?.email}</span>.
             </p>
 
+            {/* SIMULATED INBOX NOTIFICATION */}
+            <motion.div 
+              initial={{ y: -10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="mb-6 p-4 rounded-2xl bg-gradient-to-br from-cyan-50 to-sky-50 border border-cyan-100/50 flex items-start gap-3 text-left"
+            >
+              <div className="p-2 rounded-xl bg-cyan-500 text-white shadow-md shadow-cyan-500/10 shrink-0">
+                <Check className="w-4 h-4 stroke-[3]" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-wider text-cyan-600 font-bold font-mono">Ti Connect Sandbox Mail</span>
+                  <span className="text-[9px] text-cyan-400 font-semibold">Just Now</span>
+                </div>
+                <p className="text-xs text-cyan-900 font-semibold mt-1">
+                  We've simulated sending a security code to <span className="font-bold">{pendingAuthUser?.email}</span>.
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-xs text-cyan-600 font-medium">Your verification code is:</span>
+                  <span className="px-2 py-0.5 rounded-lg bg-cyan-600 text-white font-black font-mono text-xs shadow-sm tracking-wider">
+                    {generatedVerificationCode}
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+
             <form onSubmit={handleOtpSubmit} className="flex flex-col gap-4">
               <input
                 type="text"
@@ -421,7 +450,14 @@ export default function AuthScreens() {
 
             <div className="text-center mt-6 text-xs text-slate-400 font-medium">
               Didn't receive code?{' '}
-              <button onClick={() => alert("Verification code resent! Check your inbox or enter code '1111'.")} className="text-cyan-500 font-bold hover:underline">
+              <button 
+                type="button"
+                onClick={() => {
+                  const newCode = regenerateEmailCode();
+                  alert(`A new verification code [${newCode}] has been generated and sent!`);
+                }} 
+                className="text-cyan-500 font-bold hover:underline"
+              >
                 Re-send code.
               </button>
             </div>
@@ -814,6 +850,45 @@ export default function AuthScreens() {
               className="w-full py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-sky-600 text-white font-extrabold shadow-md shadow-cyan-300/40"
             >
               Sign In
+            </button>
+          </motion.div>
+        )}
+
+        {/* STEP 12: REGISTRATION SUCCESS POPUP */}
+        {onboardingStep === 'congrats-all' && (
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }} 
+            animate={{ scale: 1, opacity: 1 }} 
+            transition={{ type: 'spring', damping: 20, stiffness: 100 }}
+            className="text-center bg-white p-6 rounded-[32px] border border-slate-100 shadow-xl max-w-sm mx-auto flex flex-col items-center"
+          >
+            <LogoHeader />
+            
+            {/* STYLISH ACCENTUATED CHECKBOX ICON */}
+            <div className="relative my-4 flex items-center justify-center">
+              {/* Outer soft glowing rings */}
+              <div className="absolute w-24 h-24 rounded-full bg-emerald-100 animate-ping opacity-35" />
+              <div className="absolute w-20 h-20 rounded-full bg-emerald-100/80 animate-pulse" />
+              
+              {/* Main Checkbox Container */}
+              <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white shadow-lg shadow-emerald-400/30 border border-emerald-300/40">
+                <Check className="w-9 h-9 stroke-[4.5]" />
+              </div>
+            </div>
+
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight mt-6 mb-2">
+              Registration Successful!
+            </h2>
+            
+            <p className="text-slate-500 text-xs font-semibold px-4 leading-relaxed mb-8">
+              Welcome to the Ti Connect global network! Your academic profile has been initialized successfully. Enjoy exploring academic collaborations, creative research posts, and institute resources.
+            </p>
+
+            <button
+              onClick={() => setOnboardingStep('app')}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black hover:opacity-95 active:scale-[0.98] transition-all shadow-lg shadow-emerald-500/20 tracking-wider uppercase text-xs"
+            >
+              Enter Ti Connect
             </button>
           </motion.div>
         )}

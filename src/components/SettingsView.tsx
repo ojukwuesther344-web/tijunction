@@ -561,7 +561,7 @@ export default function SettingsView(props?: {
       </header>
 
       {/* Main Container */}
-      <div className="max-w-md mx-auto w-full p-4 flex flex-col gap-4">
+      <div className="max-w-xl md:max-w-2xl mx-auto w-full p-4 flex flex-col gap-4">
         
         {/* IF SUBVIEW IS ACTIVE - RENDER UNIQUE SUB MODULE PAGE */}
         <AnimatePresence mode="wait">
