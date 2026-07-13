@@ -10,13 +10,22 @@ import { Search as SearchIcon, Filter, Check, UserPlus, UserCheck, Eye } from 'l
 import { motion } from 'motion/react';
 
 export default function SearchView() {
-  const { users, currentUser, followUser, unfollowUser, isFollowingUser, posts } = useSocial();
+  const { 
+    users, 
+    currentUser, 
+    followUser, 
+    unfollowUser, 
+    isFollowingUser, 
+    posts, 
+    setTargetProfileUid, 
+    setActiveTab 
+  } = useSocial();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeChip, setActiveChip] = useState<'all' | 'profiles' | 'posts' | 'institutes'>('all');
 
   // Handle Search Queries
   const filteredUsers = users.filter(user => {
-    if (currentUser && user.uid === currentUser.uid) return false; // exclude current user from directories
+    // Current user can also be searched and found
     const matchesSearch = 
       user.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -82,55 +91,69 @@ export default function SearchView() {
             {filteredUsers.length > 0 && <h3 className="text-xs font-bold text-slate-400 tracking-wider mb-1 uppercase font-mono">Popular Users</h3>}
             {filteredUsers.map((user) => {
               const following = isFollowingUser(user.uid);
+              const isMe = currentUser && user.uid === currentUser.uid;
               return (
                 <motion.div 
                   key={user.uid} 
-                  className="bg-white rounded-2xl p-4 flex items-center justify-between shadow-sm border border-slate-100"
+                  className="bg-white rounded-2xl p-4 flex items-center justify-between shadow-sm border border-slate-100 hover:border-slate-200 transition-colors"
                   initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
                 >
-                  <div className="flex items-center gap-3">
+                  <div 
+                    className="flex items-center gap-3 cursor-pointer group flex-1 mr-2 min-w-0"
+                    onClick={() => {
+                      setTargetProfileUid(user.uid);
+                      setActiveTab('profile');
+                    }}
+                  >
                     <img 
                       src={user.profilePhoto || 'https://images.unsplash.com/photo-1535713875003-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80'} 
                       alt={user.fullName} 
-                      className="w-12 h-12 rounded-full object-cover border border-slate-50"
+                      className="w-12 h-12 rounded-full object-cover border border-slate-50 group-hover:ring-2 group-hover:ring-cyan-500 transition-all"
                       referrerPolicy="no-referrer"
                     />
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-bold text-slate-800 leading-none">{user.fullName}</span>
+                        <span className="text-sm font-bold text-slate-800 leading-none group-hover:text-cyan-600 transition-colors">{user.fullName}</span>
                         {user.verified && (
                           <div className="w-3.5 h-3.5 rounded-full bg-cyan-500 text-white flex items-center justify-center text-[8px] font-bold">✓</div>
                         )}
                       </div>
-                      <span className="text-xs text-slate-450 font-medium">@{user.username}</span>
+                      <span className="text-xs text-slate-400 font-medium block">@{user.username}</span>
                       <p className="text-[10px] text-slate-400 font-semibold truncate max-w-[170px] mt-1 capitalize">
                         {user.userType} • {user.location}
                       </p>
                     </div>
                   </div>
 
-                  {/* Follow controls */}
-                  <button
-                    onClick={() => toggleFollow(user)}
-                    className={`py-2 px-3.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
-                      following 
-                        ? 'bg-slate-100 text-slate-600 border border-slate-200' 
-                        : 'bg-gradient-to-r from-cyan-500 to-sky-600 text-white shadow-sm shadow-cyan-300/30'
-                    }`}
-                  >
-                    {following ? (
-                      <>
-                        <UserCheck className="w-3.5 h-3.5" />
-                        <span>Following</span>
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="w-3.5 h-3.5" />
-                        <span>Follow</span>
-                      </>
-                    )}
-                  </button>
+                  {/* Follow / Edit controls */}
+                  {isMe ? (
+                    <div className="py-2 px-3.5 bg-slate-100 text-slate-500 rounded-xl text-xs font-bold border border-slate-200 shadow-sm flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>
+                      <span>You</span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => toggleFollow(user)}
+                      className={`py-2 px-3.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                        following 
+                          ? 'bg-slate-100 text-slate-600 border border-slate-200' 
+                          : 'bg-gradient-to-r from-cyan-500 to-sky-600 text-white shadow-sm shadow-cyan-300/30'
+                      }`}
+                    >
+                      {following ? (
+                        <>
+                          <UserCheck className="w-3.5 h-3.5" />
+                          <span>Following</span>
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="w-3.5 h-3.5" />
+                          <span>Follow</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </motion.div>
               );
             })}
@@ -148,9 +171,15 @@ export default function SearchView() {
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
               >
-                <div className="flex items-center gap-2 mb-2">
-                  <img src={post.profilePhoto} alt={post.username} className="w-6 h-6 rounded-full object-cover" referrerPolicy="no-referrer" />
-                  <span className="text-xs font-bold text-slate-700">@{post.username}</span>
+                <div 
+                  className="flex items-center gap-2 mb-2 cursor-pointer group w-fit"
+                  onClick={() => {
+                    setTargetProfileUid(post.userId);
+                    setActiveTab('profile');
+                  }}
+                >
+                  <img src={post.profilePhoto} alt={post.username} className="w-6 h-6 rounded-full object-cover group-hover:ring-1 group-hover:ring-cyan-500 transition-all" referrerPolicy="no-referrer" />
+                  <span className="text-xs font-bold text-slate-700 group-hover:text-cyan-600 transition-colors">@{post.username}</span>
                 </div>
                 <p className="text-sm text-slate-600 line-clamp-3">{post.text}</p>
                 <div className="flex items-center gap-2 text-[10px] text-slate-405 font-bold mt-3">

@@ -139,6 +139,8 @@ interface SocialContextProps {
   enableMockBypass: () => void;
   activeTab: 'home' | 'search' | 'create' | 'chat' | 'alerts' | 'profile' | 'settings' | 'shorts' | 'menu';
   setActiveTab: React.Dispatch<React.SetStateAction<'home' | 'search' | 'create' | 'chat' | 'alerts' | 'profile' | 'settings' | 'shorts' | 'menu'>>;
+  targetProfileUid: string | null;
+  setTargetProfileUid: React.Dispatch<React.SetStateAction<string | null>>;
   reels: Reel[];
   createReel: (videoUrl: string, caption: string) => Promise<void>;
   toggleLikeReel: (reelId: string) => Promise<void>;
@@ -205,7 +207,22 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
   // Application Data States (reloaded from localStorage for immediate, stateful mock interactions)
   const [users, setUsers] = useState<UserProfile[]>(() => {
     const saved = localStorage.getItem('collegio_users');
-    return saved ? JSON.parse(saved) : INITIAL_USERS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as UserProfile[];
+        const parsedUids = new Set(parsed.map(u => u.uid));
+        const missing = INITIAL_USERS.filter(u => !parsedUids.has(u.uid));
+        if (missing.length > 0) {
+          const combined = [...parsed, ...missing];
+          localStorage.setItem('collegio_users', JSON.stringify(combined));
+          return combined;
+        }
+        return parsed;
+      } catch (e) {
+        return INITIAL_USERS;
+      }
+    }
+    return INITIAL_USERS;
   });
 
   const [posts, setPosts] = useState<Post[]>(() => {
@@ -280,6 +297,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [activeTab, setActiveTab] = useState<'home' | 'search' | 'create' | 'chat' | 'alerts' | 'profile' | 'settings' | 'shorts' | 'menu'>('home');
+  const [targetProfileUid, setTargetProfileUid] = useState<string | null>(null);
 
   const [reels, setReels] = useState<Reel[]>(() => {
     const saved = localStorage.getItem('collegio_reels');
@@ -594,6 +612,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [isLoading, setIsLoading] = useState(false);
+  const [authInitialized, setAuthInitialized] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('collegio_dark_mode');
     return saved === 'true';
@@ -612,12 +631,14 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
   // Local state to track running mock override (e.g. if authentication provider is disabled)
   const [isFirebaseMock, setIsFirebaseMock] = useState(() => {
-    return originalIsFirebaseMock;
+    const forced = localStorage.getItem('collegio_force_mock') === 'true';
+    return originalIsFirebaseMock || forced;
   });
 
   const enableMockBypass = () => {
     localStorage.setItem('collegio_force_mock', 'true');
     setIsFirebaseMock(true);
+    setAuthInitialized(true);
     // Log in instantly as Clara
     const target = users.find(u => u.username === 'clara_h') || users[0] || INITIAL_USERS[0];
     setCurrentUser(target);
@@ -730,7 +751,10 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
   // Firebase Realauth Listener integration
   useEffect(() => {
-    if (isFirebaseMock) return;
+    if (isFirebaseMock) {
+      setAuthInitialized(true);
+      return;
+    }
 
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       setIsLoading(true);
@@ -755,15 +779,20 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
           setOnboardingStep('welcome');
         }
       }
+      setAuthInitialized(true);
       setIsLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [isFirebaseMock]);
 
   // REAL TIME DATABASE SUB EVENTS (only if using real Firebase and user logged in)
   useEffect(() => {
-    if (isFirebaseMock || !currentUser) return;
+    if (isFirebaseMock || !currentUser || !authInitialized) return;
+    if (!auth.currentUser) {
+      console.log("Skipping Firestore real-time sub-events because auth is not completed/no user in Firebase Auth.");
+      return;
+    }
 
     // Real-time Users Listener with automatic DB seeder fallback
     const usersQuery = query(collection(db, 'users'));
@@ -835,6 +864,18 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         setUsers(fetchedUsers);
+        // Double check if any INITIAL_USERS are missing in the fetched database users, and seed them!
+        try {
+          const fetchedUids = new Set(fetchedUsers.map(u => u.uid));
+          for (const u of INITIAL_USERS) {
+            if (!fetchedUids.has(u.uid)) {
+              console.log(`Seeding missing initial user to Firestore: ${u.fullName}`);
+              await setDoc(doc(db, 'users', u.uid), u);
+            }
+          }
+        } catch (err) {
+          console.error("Error seeding missing initial users to Firestore:", err);
+        }
       }
     }, (error) => {
       console.error("Error reading users list:", error);
@@ -971,7 +1012,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       unsubscribeReels();
       unsubscribeActivities();
     };
-  }, [currentUser]);
+  }, [currentUser, authInitialized, isFirebaseMock]);
 
   // AUTH ACTIONS
   const loginWithGoogle = async () => {
@@ -1049,14 +1090,54 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         }
         
         const cred = await signInWithEmailAndPassword(auth, emailToUse, password);
-        const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
+        let userDoc = await getDoc(doc(db, 'users', cred.user.uid));
+        
+        if (!userDoc.exists()) {
+          console.warn("User document not found in Firestore. Reconstructing profile dynamically...");
+          const email = cred.user.email || emailToUse;
+          const fallbackUsername = (email.split('@')[0] || "user").toLowerCase().replace(/[^a-zA-Z0-9_]/g, '') + "_" + cred.user.uid.slice(-4);
+          const fallbackFullName = cred.user.displayName || email.split('@')[0] || "Academic Scholar";
+          
+          const healedProfile: UserProfile = {
+            uid: cred.user.uid,
+            fullName: fallbackFullName,
+            username: fallbackUsername,
+            email: email,
+            bio: "Academic profile successfully registered & verified! 🎓",
+            userType: 'student',
+            profilePhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&h=400&q=80',
+            coverPhoto: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=800&h=300&q=80',
+            website: '',
+            location: 'United States',
+            followersCount: 0,
+            followingCount: 0,
+            postsCount: 0,
+            verified: true,
+            createdAt: new Date().toISOString(),
+            instituteVerified: true,
+            instituteName: 'Academic Institute'
+          };
+          
+          try {
+            await setDoc(doc(db, 'users', cred.user.uid), healedProfile);
+            userDoc = await getDoc(doc(db, 'users', cred.user.uid));
+          } catch (healErr: any) {
+            console.error("Failed to heal/create missing user document in Firestore:", healErr);
+            // Fallback to local memory if Firestore write fails, so user is not blocked
+            setUsers(prev => [healedProfile, ...prev]);
+            setCurrentUser(healedProfile);
+            setOnboardingStep('app');
+            return;
+          }
+        }
+
         if (userDoc.exists()) {
           const profile = userDoc.data() as UserProfile;
           setCurrentUser(profile);
           setOnboardingStep('app');
           logActivity(profile.uid, profile.fullName, profile.username, profile.profilePhoto, 'login', 'logged in securely under registered profile 🔐');
         } else {
-          throw new Error("No database user record exists.");
+          throw new Error("No database user record exists. Please try registering again.");
         }
       } else {
         // Mock Auth
@@ -1232,6 +1313,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       if (!isFirebaseMock) {
         await signOut(auth);
       }
+      localStorage.removeItem('collegio_force_mock');
+      setIsFirebaseMock(originalIsFirebaseMock);
+      setAuthInitialized(false);
       setCurrentUser(null);
       setOnboardingStep('welcome');
     } catch (err) {
@@ -2032,6 +2116,8 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       setDarkMode,
       activeTab,
       setActiveTab,
+      targetProfileUid,
+      setTargetProfileUid,
       reels,
       createReel,
       toggleLikeReel,

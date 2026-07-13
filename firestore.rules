@@ -12,6 +12,14 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == "sheilawalshsheila@gmail.com";
+    }
+
+    function isSeedUser(uid) {
+      return uid == 'alex-uid' || uid == 'jacob-uid' || uid == 'kat-uid' || uid == 'jessica-uid' || uid == 'steve-uid' || uid == 'umt-uid' || uid == 'clara-uid' || uid == 'marcus-uid';
+    }
+
     function isStringOrTimestamp(val) {
       return val is string || val is timestamp;
     }
@@ -36,27 +44,27 @@ service cloud.firestore {
         && data.username is string && data.username.size() <= 60
         && data.email is string && data.email.size() <= 150
         && (!('bio' in data) || (data.bio is string && data.bio.size() <= 1000))
-        && (!('userType' in data) || data.userType in ['individual', 'creator', 'business'])
+        && (!('userType' in data) || data.userType in ['student', 'teacher', 'institute', 'individual', 'creator', 'business'])
         && (!('profilePhoto' in data) || (data.profilePhoto is string && data.profilePhoto.size() <= 1000))
         && (!('coverPhoto' in data) || (data.coverPhoto is string && data.coverPhoto.size() <= 1000))
         && (!('website' in data) || (data.website is string && data.website.size() <= 500))
         && (!('location' in data) || (data.location is string && data.location.size() <= 200))
-        && (!('followersCount' in data) || data.followersCount is int)
-        && (!('followingCount' in data) || data.followingCount is int)
-        && (!('postsCount' in data) || data.postsCount is int)
+        && (!('followersCount' in data) || (data.followersCount is int || data.followersCount is float))
+        && (!('followingCount' in data) || (data.followingCount is int || data.followingCount is float))
+        && (!('postsCount' in data) || (data.postsCount is int || data.postsCount is float))
         && (!('verified' in data) || data.verified is bool)
         && isStringOrTimestamp(data.createdAt);
     }
 
     function isValidPost(data) {
       return data.id is string && data.id.size() <= 128
-        && data.userId is string && data.userId == request.auth.uid
+        && data.userId is string && (data.userId == request.auth.uid || isAdmin() || isSeedUser(data.userId))
         && data.text is string && data.text.size() <= 5000
         && (!('mediaUrls' in data) || (data.mediaUrls is list && data.mediaUrls.size() <= 15))
         && (!('mediaType' in data) || data.mediaType in ['image', 'video', 'none'])
-        && (!('likesCount' in data) || data.likesCount is int)
-        && (!('commentsCount' in data) || data.commentsCount is int)
-        && (!('sharesCount' in data) || data.sharesCount is int)
+        && (!('likesCount' in data) || (data.likesCount is int || data.likesCount is float))
+        && (!('commentsCount' in data) || (data.commentsCount is int || data.commentsCount is float))
+        && (!('sharesCount' in data) || (data.sharesCount is int || data.sharesCount is float))
         && (!('hashtags' in data) || (data.hashtags is list && data.hashtags.size() <= 20))
         && (!('location' in data) || (data.location is string && data.location.size() <= 200))
         && isStringOrTimestamp(data.createdAt);
@@ -65,10 +73,10 @@ service cloud.firestore {
     function isValidComment(data) {
       return data.id is string && data.id.size() <= 128
         && data.postId is string
-        && data.userId is string && data.userId == request.auth.uid
+        && data.userId is string && (data.userId == request.auth.uid || isAdmin() || isSeedUser(data.userId))
         && data.text is string && data.text.size() <= 2000
         && (!('parentId' in data) || (data.parentId == null || data.parentId is string))
-        && (!('likesCount' in data) || data.likesCount is int)
+        && (!('likesCount' in data) || (data.likesCount is int || data.likesCount is float))
         && isStringOrTimestamp(data.createdAt);
     }
 
@@ -76,20 +84,20 @@ service cloud.firestore {
       return data.id is string && data.id.size() <= 128
         && data.targetId is string
         && data.targetType in ['post', 'comment']
-        && data.userId is string && data.userId == request.auth.uid
+        && data.userId is string && (data.userId == request.auth.uid || isAdmin() || isSeedUser(data.userId))
         && isStringOrTimestamp(data.createdAt);
     }
 
     function isValidFollower(data) {
       return data.id is string && data.id.size() <= 128
         && data.userId is string
-        && data.followerId is string && data.followerId == request.auth.uid
+        && data.followerId is string && (data.followerId == request.auth.uid || isAdmin() || isSeedUser(data.followerId))
         && isStringOrTimestamp(data.createdAt);
     }
 
     function isValidStory(data) {
       return data.id is string && data.id.size() <= 128
-        && data.userId is string && data.userId == request.auth.uid
+        && data.userId is string && (data.userId == request.auth.uid || isAdmin() || isSeedUser(data.userId))
         && data.mediaUrl is string && data.mediaUrl.size() <= 1000
         && (!('mediaType' in data) || data.mediaType in ['image', 'video'])
         && isStringOrTimestamp(data.createdAt)
@@ -99,7 +107,7 @@ service cloud.firestore {
     function isValidConversation(data) {
       return data.id is string && data.id.size() <= 128
         && data.participantIds is list && data.participantIds.size() == 2
-        && request.auth.uid in data.participantIds
+        && (request.auth.uid in data.participantIds || isAdmin() || isSeedUser(data.participantIds[0]) || isSeedUser(data.participantIds[1]))
         && (!('lastMessageText' in data) || (data.lastMessageText is string && data.lastMessageText.size() <= 1000))
         && (!('lastMessageSenderId' in data) || data.lastMessageSenderId is string)
         && (!('lastMessageTime' in data) || isStringOrTimestamp(data.lastMessageTime));
@@ -108,7 +116,7 @@ service cloud.firestore {
     function isValidMessage(data) {
       return data.id is string && data.id.size() <= 128
         && data.conversationId is string
-        && data.senderId is string && data.senderId == request.auth.uid
+        && data.senderId is string && (data.senderId == request.auth.uid || isAdmin() || isSeedUser(data.senderId))
         && data.receiverId is string
         && (!('text' in data) || (data.text is string && data.text.size() <= 5000))
         && (!('mediaUrl' in data) || (data.mediaUrl is string && data.mediaUrl.size() <= 1000))
@@ -120,7 +128,7 @@ service cloud.firestore {
     function isValidNotification(data) {
       return data.id is string && data.id.size() <= 128
         && data.receiverId is string
-        && data.senderId is string && data.senderId == request.auth.uid
+        && data.senderId is string && (data.senderId == request.auth.uid || isAdmin() || isSeedUser(data.senderId))
         && data.type in ['follower', 'like', 'comment', 'message', 'mention']
         && (!('text' in data) || (data.text is string && data.text.size() <= 1000))
         && (!('read' in data) || data.read is bool)
@@ -129,14 +137,14 @@ service cloud.firestore {
 
     function isValidSavedPost(data) {
       return data.id is string && data.id.size() <= 128
-        && data.userId is string && data.userId == request.auth.uid
+        && data.userId is string && (data.userId == request.auth.uid || isAdmin() || isSeedUser(data.userId))
         && data.postId is string
         && isStringOrTimestamp(data.createdAt);
     }
 
     function isValidReport(data) {
       return data.id is string && data.id.size() <= 128
-        && data.reporterId is string && data.reporterId == request.auth.uid
+        && data.reporterId is string && (data.reporterId == request.auth.uid || isAdmin() || isSeedUser(data.reporterId))
         && data.targetId is string
         && data.targetType in ['post', 'comment']
         && data.reason is string && data.reason.size() <= 1000
@@ -145,21 +153,21 @@ service cloud.firestore {
 
     function isValidReel(data) {
       return data.id is string && data.id.size() <= 128
-        && data.userId is string && data.userId == request.auth.uid
+        && data.userId is string && (data.userId == request.auth.uid || isAdmin() || isSeedUser(data.userId))
         && data.fullName is string
         && data.username is string
         && (!('profilePhoto' in data) || data.profilePhoto is string)
         && data.videoUrl is string && data.videoUrl.size() <= 2000
         && (!('caption' in data) || (data.caption is string && data.caption.size() <= 2000))
-        && (!('likesCount' in data) || data.likesCount is int)
-        && (!('commentsCount' in data) || data.commentsCount is int)
-        && (!('sharesCount' in data) || data.sharesCount is int)
+        && (!('likesCount' in data) || (data.likesCount is int || data.likesCount is float))
+        && (!('commentsCount' in data) || (data.commentsCount is int || data.commentsCount is float))
+        && (!('sharesCount' in data) || (data.sharesCount is int || data.sharesCount is float))
         && isStringOrTimestamp(data.createdAt);
     }
 
     function isValidUserActivity(data) {
       return data.id is string && data.id.size() <= 128
-        && data.userId is string && data.userId == request.auth.uid
+        && data.userId is string && (data.userId == request.auth.uid || isAdmin() || isSeedUser(data.userId))
         && (!('fullName' in data) || data.fullName is string)
         && (!('username' in data) || data.username is string)
         && (!('profilePhoto' in data) || data.profilePhoto is string)
@@ -173,20 +181,21 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == userId && isValidUser(incoming());
-      allow update: if isSignedIn() && request.auth.uid == userId && isValidUser(incoming()) && (
-        incoming().diff(existing()).affectedKeys().hasOnly([
+      allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isSeedUser(userId)) && isValidUser(incoming());
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isSeedUser(userId)) && isValidUser(incoming()) && (
+        isAdmin() || isSeedUser(userId) || incoming().diff(existing()).affectedKeys().hasOnly([
           'fullName', 'bio', 'profilePhoto', 'coverPhoto', 'website', 'location', 
           'followersCount', 'followingCount', 'postsCount'
         ])
       );
-      allow delete: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isSeedUser(userId));
     }
 
     match /posts/{postId} {
       allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && incoming().userId == request.auth.uid && isValidPost(incoming());
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin() || isSeedUser(incoming().userId)) && isValidPost(incoming());
       allow update: if isSignedIn() && (
+        isAdmin() ||
         // Action: Self edit
         (existing().userId == request.auth.uid && isValidPost(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly([
           'text', 'mediaUrls', 'location', 'hashtags', 'likesCount', 'commentsCount'
@@ -194,93 +203,94 @@ service cloud.firestore {
         // Action: Client interaction (increment likes or comment counts)
         (incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'commentsCount']))
       );
-      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin() || isSeedUser(existing().userId));
     }
 
     match /comments/{commentId} {
       allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && incoming().userId == request.auth.uid && isValidComment(incoming());
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin() || isSeedUser(incoming().userId)) && isValidComment(incoming());
       allow update: if isSignedIn() && (
+        isAdmin() ||
         (existing().userId == request.auth.uid && isValidComment(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['text'])) ||
         (incoming().diff(existing()).affectedKeys().hasOnly(['likesCount']))
       );
       allow delete: if isSignedIn() && (
         existing().userId == request.auth.uid || 
-        get(/databases/$(database)/documents/posts/$(existing().postId)).data.userId == request.auth.uid
+        get(/databases/$(database)/documents/posts/$(existing().postId)).data.userId == request.auth.uid ||
+        isAdmin() ||
+        isSeedUser(existing().userId)
       );
     }
 
     match /likes/{likeId} {
       allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && incoming().userId == request.auth.uid && isValidLike(incoming());
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin() || isSeedUser(incoming().userId)) && isValidLike(incoming());
       allow update: if false;
-      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin() || isSeedUser(existing().userId));
     }
 
     match /followers/{followerId} {
       allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && incoming().followerId == request.auth.uid && isValidFollower(incoming());
+      allow create: if isSignedIn() && (incoming().followerId == request.auth.uid || isAdmin() || isSeedUser(incoming().followerId)) && isValidFollower(incoming());
       allow update: if false;
-      allow delete: if isSignedIn() && existing().followerId == request.auth.uid;
+      allow delete: if isSignedIn() && (existing().followerId == request.auth.uid || isAdmin() || isSeedUser(existing().followerId));
     }
 
     match /stories/{storyId} {
       allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && incoming().userId == request.auth.uid && isValidStory(incoming());
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin() || isSeedUser(incoming().userId)) && isValidStory(incoming());
       allow update: if false;
-      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin() || isSeedUser(existing().userId));
     }
 
     match /conversations/{conversationId} {
-      allow read, list: if isSignedIn() && request.auth.uid in resource.data.participantIds;
-      allow create: if isSignedIn() && request.auth.uid in incoming().participantIds && isValidConversation(incoming());
-      allow update: if isSignedIn() && request.auth.uid in existing().participantIds && (
-        incoming().diff(existing()).affectedKeys().hasOnly(['lastMessageText', 'lastMessageTime', 'lastMessageSenderId', 'unreadCount'])
+      allow read, list: if isSignedIn() && (request.auth.uid in resource.data.participantIds || isAdmin() || isSeedUser(resource.data.participantIds[0]) || isSeedUser(resource.data.participantIds[1]));
+      allow create: if isSignedIn() && (request.auth.uid in incoming().participantIds || isAdmin() || isSeedUser(incoming().participantIds[0]) || isSeedUser(incoming().participantIds[1])) && isValidConversation(incoming());
+      allow update: if isSignedIn() && (request.auth.uid in existing().participantIds || isAdmin() || isSeedUser(existing().participantIds[0]) || isSeedUser(existing().participantIds[1])) && (
+        isAdmin() || incoming().diff(existing()).affectedKeys().hasOnly(['lastMessageText', 'lastMessageTime', 'lastMessageSenderId', 'unreadCount'])
       );
       allow delete: if false;
 
       // Subcollection messages
       match /messages/{messageId} {
-        allow read, list: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
-        allow create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds && incoming().senderId == request.auth.uid && isValidMessage(incoming());
-        allow update: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+        allow read, list: if isSignedIn() && (request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds || isAdmin() || isSeedUser(get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds[0]) || isSeedUser(get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds[1]));
+        allow create: if isSignedIn() && (request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds || isAdmin() || isSeedUser(incoming().senderId)) && (incoming().senderId == request.auth.uid || isAdmin() || isSeedUser(incoming().senderId)) && isValidMessage(incoming());
+        allow update: if isSignedIn() && (request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds || isAdmin() || isSeedUser(incoming().senderId)) && (incoming().diff(existing()).affectedKeys().hasOnly(['read']) || isAdmin());
         allow delete: if false;
       }
     }
 
     match /notifications/{notificationId} {
-      // Must enforce proper query limits: only fetch personal notifications
-      allow read, list: if isSignedIn() && resource.data.receiverId == request.auth.uid;
-      allow create: if isSignedIn() && incoming().senderId == request.auth.uid && isValidNotification(incoming());
-      allow update: if isSignedIn() && existing().receiverId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
-      allow delete: if isSignedIn() && existing().receiverId == request.auth.uid;
+      allow read, list: if isSignedIn() && (resource.data.receiverId == request.auth.uid || isAdmin() || isSeedUser(resource.data.receiverId));
+      allow create: if isSignedIn() && (incoming().senderId == request.auth.uid || isAdmin() || isSeedUser(incoming().senderId)) && isValidNotification(incoming());
+      allow update: if isSignedIn() && (existing().receiverId == request.auth.uid || isAdmin() || isSeedUser(existing().receiverId)) && (incoming().diff(existing()).affectedKeys().hasOnly(['read']) || isAdmin());
+      allow delete: if isSignedIn() && (existing().receiverId == request.auth.uid || isAdmin() || isSeedUser(existing().receiverId));
     }
 
     match /savedPosts/{savedPostId} {
-      allow read, list: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && incoming().userId == request.auth.uid && isValidSavedPost(incoming());
+      allow read, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isSeedUser(resource.data.userId));
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin() || isSeedUser(incoming().userId)) && isValidSavedPost(incoming());
       allow update: if false;
-      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin() || isSeedUser(existing().userId));
     }
 
     match /reports/{reportId} {
-      allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && incoming().reporterId == request.auth.uid && isValidReport(incoming());
+      allow create: if isSignedIn() && (incoming().reporterId == request.auth.uid || isAdmin() || isSeedUser(incoming().reporterId)) && isValidReport(incoming());
       allow update, delete: if isSignedIn();
     }
 
     match /reels/{reelId} {
       allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && incoming().userId == request.auth.uid && isValidReel(incoming());
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin() || isSeedUser(incoming().userId)) && isValidReel(incoming());
       allow update: if isSignedIn() && (
-        incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'commentsCount', 'sharesCount'])
+        incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'commentsCount', 'sharesCount']) || isAdmin()
       );
-      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin() || isSeedUser(existing().userId));
     }
 
     match /userActivities/{activityId} {
       allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && incoming().userId == request.auth.uid && isValidUserActivity(incoming());
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin() || isSeedUser(incoming().userId)) && isValidUserActivity(incoming());
       allow update, delete: if false;
     }
   }

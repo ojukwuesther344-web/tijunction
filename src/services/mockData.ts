@@ -93,6 +93,46 @@ export const INITIAL_USERS: UserProfile[] = [
     postsCount: 10,
     verified: false,
     createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    uid: 'clara-uid',
+    fullName: 'Clara Hughes',
+    username: 'clara_h',
+    email: 'clara@collegio.edu',
+    bio: 'Creative Writing & Arts student. Dreamer. Poet. Campus sunset enthusiast. 🌸📖',
+    userType: 'student',
+    profilePhoto: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&h=150&q=80',
+    coverPhoto: 'https://images.unsplash.com/photo-1518655061766-48f23af93e77?auto=format&fit=crop&w=800&h=300&q=80',
+    website: 'clarahughes.com',
+    location: 'Brooklyn, NY',
+    followersCount: 1250,
+    followingCount: 340,
+    postsCount: 4,
+    verified: true,
+    createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+    instituteCountry: 'United States',
+    instituteName: 'Brooklyn College',
+    degreeOrSubject: 'Creative Writing & Arts'
+  },
+  {
+    uid: 'marcus-uid',
+    fullName: 'Marcus Thorne',
+    username: 'marcus_t',
+    email: 'marcus@collegio.edu',
+    bio: 'Computer Science & Math major. Late nights, coffee, and compiling. 💻☕🍕',
+    userType: 'student',
+    profilePhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80',
+    coverPhoto: 'https://images.unsplash.com/photo-1607799279861-4dd421887fb3?auto=format&fit=crop&w=800&h=300&q=80',
+    website: 'marcusthorne.dev',
+    location: 'Brooklyn, NY',
+    followersCount: 980,
+    followingCount: 450,
+    postsCount: 7,
+    verified: true,
+    createdAt: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
+    instituteCountry: 'United States',
+    instituteName: 'Brooklyn College',
+    degreeOrSubject: 'Computer Science & Math'
   }
 ];
 

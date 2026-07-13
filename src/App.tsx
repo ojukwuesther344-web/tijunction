@@ -37,13 +37,12 @@ function SocialAppContent() {
     users,
     activeTab,
     setActiveTab,
+    targetProfileUid,
+    setTargetProfileUid,
     darkMode,
     setDarkMode,
     logout
   } = useSocial();
-
-  // Let other pages request target user profile viewing
-  const [targetProfileUid, setTargetProfileUid] = useState<string | null>(null);
 
   // Nested sub-views state inside SettingsView
   const [activeSubView, setActiveSubView] = useState<string | null>(null);
@@ -337,15 +336,22 @@ function SocialAppContent() {
 
           {/* User profile section at bottom of desktop left sidebar */}
           <div className="border-t border-slate-200/80 pt-4 flex items-center justify-between">
-            <div className="flex items-center gap-3 overflow-hidden">
+            <div 
+              onClick={() => {
+                setActiveTab('profile');
+                setTargetProfileUid(null);
+              }}
+              className="flex items-center gap-3 overflow-hidden cursor-pointer hover:opacity-80 group flex-1"
+              title="Go to My Profile"
+            >
               <img 
                 src={currentUser?.profilePhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80'} 
                 alt="Me" 
-                className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                className="w-10 h-10 rounded-full object-cover border border-slate-200 group-hover:ring-2 group-hover:ring-cyan-500 transition-all"
                 referrerPolicy="no-referrer"
               />
               <div className="flex flex-col text-left overflow-hidden">
-                <span className="text-xs font-black text-slate-800 truncate leading-tight">{currentUser?.fullName}</span>
+                <span className="text-xs font-black text-slate-800 truncate leading-tight group-hover:text-cyan-600 transition-colors">{currentUser?.fullName}</span>
                 <span className="text-[10px] text-slate-400 font-extrabold truncate">@{currentUser?.username}</span>
               </div>
             </div>
@@ -551,7 +557,7 @@ function SocialAppContent() {
 
         {/* Floating action buttons */}
         <div className="absolute bottom-6 right-4 flex flex-col gap-2 z-20">
-          {activeTab === 'home' && users.length > 0 && (
+          {activeTab === 'home' && users.length > 1 && users[1] && (
             <div className="flex flex-col items-end gap-1">
               <span className="text-[10px] font-bold text-slate-400 bg-white shadow-sm p-1 px-2.5 rounded-full capitalize border border-slate-100">Quick view peer:</span>
               <button 

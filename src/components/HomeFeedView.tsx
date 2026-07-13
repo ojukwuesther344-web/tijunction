@@ -30,6 +30,7 @@ export default function HomeFeedView() {
     reportContent,
     users,
     setActiveTab,
+    setTargetProfileUid,
     reels,
     followUser,
     isFollowingUser,
@@ -260,20 +261,36 @@ export default function HomeFeedView() {
 
                 const spec = typeLabels[act.activityType] || { label: 'LOG', textClass: 'text-slate-700', bgClass: 'bg-slate-50' };
 
-                return (
+                 return (
                   <div key={act.id} className="flex gap-2.5 items-start py-1 rounded-2xl">
                     <img
                       src={act.profilePhoto}
                       alt={act.fullName}
-                      className="w-7 h-7 rounded-full object-cover border border-slate-100 mt-0.5 flex-shrink-0"
+                      className="w-7 h-7 rounded-full object-cover border border-slate-100 mt-0.5 flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-cyan-500 transition-all"
                       referrerPolicy="no-referrer"
+                      onClick={() => {
+                        setTargetProfileUid(act.userId);
+                        setActiveTab('profile');
+                      }}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs font-bold text-slate-800 truncate">
+                        <span 
+                          className="text-xs font-bold text-slate-800 truncate cursor-pointer hover:text-cyan-600 transition-colors"
+                          onClick={() => {
+                            setTargetProfileUid(act.userId);
+                            setActiveTab('profile');
+                          }}
+                        >
                           {act.fullName}
                         </span>
-                        <span className="text-[9px] text-slate-400 font-medium">
+                        <span 
+                          className="text-[9px] text-slate-400 font-medium cursor-pointer hover:text-cyan-500 transition-colors"
+                          onClick={() => {
+                            setTargetProfileUid(act.userId);
+                            setActiveTab('profile');
+                          }}
+                        >
                           @{act.username}
                         </span>
                         <span className={`text-[8px] font-black px-1.5 py-0.2 rounded-full ${spec.textClass} ${spec.bgClass}`}>
@@ -313,16 +330,22 @@ export default function HomeFeedView() {
                 >
                   {/* Header info */}
                   <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
+                    <div 
+                      className="flex items-center gap-3 cursor-pointer group"
+                      onClick={() => {
+                        setTargetProfileUid(post.userId);
+                        setActiveTab('profile');
+                      }}
+                    >
                       <img 
                         src={post.profilePhoto} 
                         alt={post.fullName} 
-                        className="w-11 h-11 rounded-full object-cover border border-slate-100"
+                        className="w-11 h-11 rounded-full object-cover border border-slate-100 group-hover:ring-2 group-hover:ring-cyan-500 transition-all"
                         referrerPolicy="no-referrer"
                       />
                       <div>
                         <div className="flex items-center gap-1">
-                          <h4 className="text-sm font-black text-slate-800">{post.fullName}</h4>
+                          <h4 className="text-sm font-black text-slate-800 group-hover:text-cyan-600 transition-colors">{post.fullName}</h4>
                           {post.userId === 'umt-uid' && (
                             <div className="w-3.5 h-3.5 rounded-full bg-cyan-500 text-white flex items-center justify-center text-[8px] font-bold">✓</div>
                           )}
