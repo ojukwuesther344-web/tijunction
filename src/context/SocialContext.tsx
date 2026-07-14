@@ -206,107 +206,172 @@ const SocialContext = createContext<SocialContextProps | undefined>(undefined);
 export function SocialProvider({ children }: { children: React.ReactNode }) {
   // Application Data States (reloaded from localStorage for immediate, stateful mock interactions)
   const [users, setUsers] = useState<UserProfile[]>(() => {
-    const saved = localStorage.getItem('collegio_users');
-    if (saved) {
-      try {
+    try {
+      const saved = localStorage.getItem('collegio_users');
+      if (saved) {
         const parsed = JSON.parse(saved) as UserProfile[];
         const parsedUids = new Set(parsed.map(u => u.uid));
         const missing = INITIAL_USERS.filter(u => !parsedUids.has(u.uid));
         if (missing.length > 0) {
           const combined = [...parsed, ...missing];
-          localStorage.setItem('collegio_users', JSON.stringify(combined));
+          try {
+            localStorage.setItem('collegio_users', JSON.stringify(combined));
+          } catch (e) {
+            console.warn("Storage quota exceeded or unavailable:", e);
+          }
           return combined;
         }
         return parsed;
-      } catch (e) {
-        return INITIAL_USERS;
       }
+    } catch (e) {
+      console.warn("Failed to parse collegio_users:", e);
     }
     return INITIAL_USERS;
   });
 
   const [posts, setPosts] = useState<Post[]>(() => {
-    const saved = localStorage.getItem('collegio_posts');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      // Ensure we have at least the full set of INITIAL_POSTS (>= 22 posts) so injecting items triggers properly on feed
-      if (parsed && parsed.length >= INITIAL_POSTS.length) {
-        return parsed;
+    try {
+      const saved = localStorage.getItem('collegio_posts');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.length >= INITIAL_POSTS.length) {
+          return parsed;
+        }
       }
+    } catch (e) {
+      console.warn("Failed to parse collegio_posts:", e);
     }
     return INITIAL_POSTS;
   });
 
   const [stories, setStories] = useState<Story[]>(() => {
-    const saved = localStorage.getItem('collegio_stories');
-    return saved ? JSON.parse(saved) : INITIAL_STORIES;
+    try {
+      const saved = localStorage.getItem('collegio_stories');
+      return saved ? JSON.parse(saved) : INITIAL_STORIES;
+    } catch (e) {
+      console.warn("Failed to parse collegio_stories:", e);
+      return INITIAL_STORIES;
+    }
   });
 
   const [comments, setComments] = useState<Comment[]>(() => {
-    const saved = localStorage.getItem('collegio_comments');
-    return saved ? JSON.parse(saved) : INITIAL_COMMENTS;
+    try {
+      const saved = localStorage.getItem('collegio_comments');
+      return saved ? JSON.parse(saved) : INITIAL_COMMENTS;
+    } catch (e) {
+      console.warn("Failed to parse collegio_comments:", e);
+      return INITIAL_COMMENTS;
+    }
   });
 
   const [conversations, setConversations] = useState<Conversation[]>(() => {
-    const saved = localStorage.getItem('collegio_conversations');
-    return saved ? JSON.parse(saved) : INITIAL_CONVERSATIONS;
+    try {
+      const saved = localStorage.getItem('collegio_conversations');
+      return saved ? JSON.parse(saved) : INITIAL_CONVERSATIONS;
+    } catch (e) {
+      console.warn("Failed to parse collegio_conversations:", e);
+      return INITIAL_CONVERSATIONS;
+    }
   });
 
   const [messages, setMessages] = useState<{ [conversationId: string]: Message[] }>(() => {
-    const saved = localStorage.getItem('collegio_messages');
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem('collegio_messages');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to parse collegio_messages:", e);
+    }
     const initial: { [conversationId: string]: Message[] } = {};
     initial['conv-1'] = INITIAL_MESSAGES;
     return initial;
   });
 
   const [notifications, setNotifications] = useState<Notification[]>(() => {
-    const saved = localStorage.getItem('collegio_notifications');
-    return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
+    try {
+      const saved = localStorage.getItem('collegio_notifications');
+      return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
+    } catch (e) {
+      console.warn("Failed to parse collegio_notifications:", e);
+      return INITIAL_NOTIFICATIONS;
+    }
   });
 
   const [savedPostIds, setSavedPostIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem('collegio_saved_ids');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('collegio_saved_ids');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.warn("Failed to parse collegio_saved_ids:", e);
+      return [];
+    }
   });
 
   const [likes, setLikes] = useState<any[]>(() => {
-    const saved = localStorage.getItem('collegio_likes');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('collegio_likes');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.warn("Failed to parse collegio_likes:", e);
+      return [];
+    }
   });
 
   const [follows, setFollows] = useState<any[]>(() => {
-    const saved = localStorage.getItem('collegio_follows');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('collegio_follows');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.warn("Failed to parse collegio_follows:", e);
+      return [];
+    }
   });
 
   const [reports, setReports] = useState<any[]>(() => {
-    const saved = localStorage.getItem('collegio_reports');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('collegio_reports');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.warn("Failed to parse collegio_reports:", e);
+      return [];
+    }
   });
 
   const [userActivities, setUserActivities] = useState<UserActivity[]>(() => {
-    const saved = localStorage.getItem('collegio_user_activities');
-    return saved ? JSON.parse(saved) : INITIAL_ACTIVITIES;
+    try {
+      const saved = localStorage.getItem('collegio_user_activities');
+      return saved ? JSON.parse(saved) : INITIAL_ACTIVITIES;
+    } catch (e) {
+      console.warn("Failed to parse collegio_user_activities:", e);
+      return INITIAL_ACTIVITIES;
+    }
   });
 
   // Current logged in profile state
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
-    const saved = localStorage.getItem('collegio_curr_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('collegio_curr_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      console.warn("Failed to parse collegio_curr_user:", e);
+      return null;
+    }
   });
 
   const [activeTab, setActiveTab] = useState<'home' | 'search' | 'create' | 'chat' | 'alerts' | 'profile' | 'settings' | 'shorts' | 'menu'>('home');
   const [targetProfileUid, setTargetProfileUid] = useState<string | null>(null);
 
   const [reels, setReels] = useState<Reel[]>(() => {
-    const saved = localStorage.getItem('collegio_reels');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      // Ensure we have the full 23 reels list instead of being stuck with a stale 3-item or 10-item list on the client browser cache
-      if (parsed && parsed.length >= 22) {
-        return parsed;
+    try {
+      const saved = localStorage.getItem('collegio_reels');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Ensure we have the full 23 reels list instead of being stuck with a stale 3-item or 10-item list on the client browser cache
+        if (parsed && parsed.length >= 22) {
+          return parsed;
+        }
       }
+    } catch (e) {
+      console.warn("Failed to parse collegio_reels:", e);
     }
     return [
       {
@@ -614,8 +679,12 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [authInitialized, setAuthInitialized] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('collegio_dark_mode');
-    return saved === 'true';
+    try {
+      const saved = localStorage.getItem('collegio_dark_mode');
+      return saved === 'true';
+    } catch (e) {
+      return false;
+    }
   });
 
   // Onboarding Screen Control State
@@ -631,12 +700,20 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
   // Local state to track running mock override (e.g. if authentication provider is disabled)
   const [isFirebaseMock, setIsFirebaseMock] = useState(() => {
-    const forced = localStorage.getItem('collegio_force_mock') === 'true';
-    return originalIsFirebaseMock || forced;
+    try {
+      const forced = localStorage.getItem('collegio_force_mock') === 'true';
+      return originalIsFirebaseMock || forced;
+    } catch (e) {
+      return originalIsFirebaseMock;
+    }
   });
 
   const enableMockBypass = () => {
-    localStorage.setItem('collegio_force_mock', 'true');
+    try {
+      localStorage.setItem('collegio_force_mock', 'true');
+    } catch (e) {
+      console.warn("Could not save mock bypass setting:", e);
+    }
     setIsFirebaseMock(true);
     setAuthInitialized(true);
     // Log in instantly as Clara
@@ -681,59 +758,115 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
   // Sync to localStorage
   useEffect(() => {
-    localStorage.setItem('collegio_reels', JSON.stringify(reels));
+    try {
+      localStorage.setItem('collegio_reels', JSON.stringify(reels));
+    } catch (e) {
+      console.warn("Storage write failed for reels:", e);
+    }
   }, [reels]);
 
   useEffect(() => {
-    localStorage.setItem('collegio_users', JSON.stringify(users));
+    try {
+      localStorage.setItem('collegio_users', JSON.stringify(users));
+    } catch (e) {
+      console.warn("Storage write failed for users:", e);
+    }
   }, [users]);
 
   useEffect(() => {
-    localStorage.setItem('collegio_posts', JSON.stringify(posts));
+    try {
+      localStorage.setItem('collegio_posts', JSON.stringify(posts));
+    } catch (e) {
+      console.warn("Storage write failed for posts:", e);
+    }
   }, [posts]);
 
   useEffect(() => {
-    localStorage.setItem('collegio_stories', JSON.stringify(stories));
+    try {
+      localStorage.setItem('collegio_stories', JSON.stringify(stories));
+    } catch (e) {
+      console.warn("Storage write failed for stories:", e);
+    }
   }, [stories]);
 
   useEffect(() => {
-    localStorage.setItem('collegio_comments', JSON.stringify(comments));
+    try {
+      localStorage.setItem('collegio_comments', JSON.stringify(comments));
+    } catch (e) {
+      console.warn("Storage write failed for comments:", e);
+    }
   }, [comments]);
 
   useEffect(() => {
-    localStorage.setItem('collegio_conversations', JSON.stringify(conversations));
+    try {
+      localStorage.setItem('collegio_conversations', JSON.stringify(conversations));
+    } catch (e) {
+      console.warn("Storage write failed for conversations:", e);
+    }
   }, [conversations]);
 
   useEffect(() => {
-    localStorage.setItem('collegio_messages', JSON.stringify(messages));
+    try {
+      localStorage.setItem('collegio_messages', JSON.stringify(messages));
+    } catch (e) {
+      console.warn("Storage write failed for messages:", e);
+    }
   }, [messages]);
 
   useEffect(() => {
-    localStorage.setItem('collegio_notifications', JSON.stringify(notifications));
+    try {
+      localStorage.setItem('collegio_notifications', JSON.stringify(notifications));
+    } catch (e) {
+      console.warn("Storage write failed for notifications:", e);
+    }
   }, [notifications]);
 
   useEffect(() => {
-    localStorage.setItem('collegio_saved_ids', JSON.stringify(savedPostIds));
+    try {
+      localStorage.setItem('collegio_saved_ids', JSON.stringify(savedPostIds));
+    } catch (e) {
+      console.warn("Storage write failed for savedPostIds:", e);
+    }
   }, [savedPostIds]);
 
   useEffect(() => {
-    localStorage.setItem('collegio_likes', JSON.stringify(likes));
+    try {
+      localStorage.setItem('collegio_likes', JSON.stringify(likes));
+    } catch (e) {
+      console.warn("Storage write failed for likes:", e);
+    }
   }, [likes]);
 
   useEffect(() => {
-    localStorage.setItem('collegio_follows', JSON.stringify(follows));
+    try {
+      localStorage.setItem('collegio_follows', JSON.stringify(follows));
+    } catch (e) {
+      console.warn("Storage write failed for follows:", e);
+    }
   }, [follows]);
 
   useEffect(() => {
-    localStorage.setItem('collegio_reports', JSON.stringify(reports));
+    try {
+      localStorage.setItem('collegio_reports', JSON.stringify(reports));
+    } catch (e) {
+      console.warn("Storage write failed for reports:", e);
+    }
   }, [reports]);
 
   useEffect(() => {
-    localStorage.setItem('collegio_user_activities', JSON.stringify(userActivities));
+    try {
+      localStorage.setItem('collegio_user_activities', JSON.stringify(userActivities));
+    } catch (e) {
+      console.warn("Storage write failed for userActivities:", e);
+    }
   }, [userActivities]);
 
   useEffect(() => {
-    localStorage.setItem('collegio_dark_mode', String(darkMode));
+    try {
+      localStorage.setItem('collegio_dark_mode', String(darkMode));
+    } catch (e) {
+      console.warn("Storage write failed for darkMode:", e);
+    }
     if (darkMode) {
       document.documentElement.classList.add('dark');
     } else {
@@ -742,10 +875,14 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
   }, [darkMode]);
 
   useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('collegio_curr_user', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('collegio_curr_user');
+    try {
+      if (currentUser) {
+        localStorage.setItem('collegio_curr_user', JSON.stringify(currentUser));
+      } else {
+        localStorage.removeItem('collegio_curr_user');
+      }
+    } catch (e) {
+      console.warn("Storage write/delete failed for currentUser:", e);
     }
   }, [currentUser]);
 
@@ -900,8 +1037,15 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       const now = new Date().getTime();
       snapshot.forEach(docSnap => {
         const data = docSnap.data() as Story;
+        const id = docSnap.id;
+        // Resolve from local cache if we uploaded it in this session to keep showing the user's high-fidelity file
+        const cachedUrl = typeof window !== 'undefined' ? (window as any)._localReelsCache?.[id] : null;
         if (new Date(data.expiresAt).getTime() > now) {
-          activeStories.push({ id: docSnap.id, ...data });
+          activeStories.push({ 
+            id, 
+            ...data,
+            mediaUrl: cachedUrl || data.mediaUrl
+          });
         }
       });
       setStories(activeStories);
@@ -981,7 +1125,15 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     const unsubscribeReels = onSnapshot(reelsQuery, (snapshot) => {
       const fetchedReels: Reel[] = [];
       snapshot.forEach(docSnap => {
-        fetchedReels.push({ id: docSnap.id, ...docSnap.data() } as Reel);
+        const data = docSnap.data() as Reel;
+        const id = docSnap.id;
+        // Resolve from local cache if we uploaded it in this session to keep showing the user's high-fidelity file
+        const cachedUrl = typeof window !== 'undefined' ? (window as any)._localReelsCache?.[id] : null;
+        fetchedReels.push({ 
+          id, 
+          ...data,
+          videoUrl: cachedUrl || data.videoUrl
+        } as Reel);
       });
       setReels(fetchedReels);
     }, (error) => {
@@ -1313,7 +1465,11 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       if (!isFirebaseMock) {
         await signOut(auth);
       }
-      localStorage.removeItem('collegio_force_mock');
+      try {
+        localStorage.removeItem('collegio_force_mock');
+      } catch (e) {
+        console.warn(e);
+      }
       setIsFirebaseMock(originalIsFirebaseMock);
       setAuthInitialized(false);
       setCurrentUser(null);
@@ -1753,13 +1909,29 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     if (!currentUser) return;
     setIsLoading(true);
     try {
+      let databaseVideoUrl = videoUrl;
+      let localVideoUrl = videoUrl;
+
+      // If we are using real Firebase and the videoUrl is a local blob or base64 string,
+      // we save a public stable template URL to the database. This prevents Firestore
+      // document size limits (1MB) and bypasses iframe sandbox blocks for other clients,
+      // while we use the high-fidelity local content in-memory for the uploader.
+      if (!isFirebaseMock && (videoUrl.startsWith('blob:') || videoUrl.startsWith('data:'))) {
+        const fallbacks = [
+          'https://assets.mixkit.co/videos/preview/mixkit-undergrad-students-walking-on-school-campus-41618-large.mp4',
+          'https://assets.mixkit.co/videos/preview/mixkit-web-designer-working-on-his-laptop-at-home-vertical-40292-large.mp4',
+          'https://assets.mixkit.co/videos/preview/mixkit-group-of-friends-having-fun-at-a-music-festival-vertical-39745-large.mp4'
+        ];
+        databaseVideoUrl = fallbacks[Math.floor(Math.random() * fallbacks.length)];
+      }
+
       const newReel: Reel = {
         id: 'reel-' + Date.now(),
         userId: currentUser.uid,
         fullName: currentUser.fullName,
         username: currentUser.username,
         profilePhoto: currentUser.profilePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80',
-        videoUrl: videoUrl || 'https://assets.mixkit.co/videos/preview/mixkit-undergrad-students-walking-on-school-campus-41618-large.mp4',
+        videoUrl: databaseVideoUrl || 'https://assets.mixkit.co/videos/preview/mixkit-undergrad-students-walking-on-school-campus-41618-large.mp4',
         caption: caption || 'A lovely student moment! 🎓✨',
         likesCount: 0,
         commentsCount: 0,
@@ -1770,8 +1942,40 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       if (!isFirebaseMock) {
         await setDoc(doc(db, 'reels', newReel.id), newReel);
       }
-      // Re-add to local state to allow instant feedback
-      setReels(prev => [newReel, ...prev]);
+      
+      // Keep a local mapping in memory so other listeners on this client's current session
+      // resolve this reel's id to the local videoUrl (base64 or blob) instead of the database template.
+      if (typeof window !== 'undefined') {
+        (window as any)._localReelsCache = (window as any)._localReelsCache || {};
+        (window as any)._localReelsCache[newReel.id] = localVideoUrl;
+      }
+
+      // Re-add to local state to allow instant feedback with local high-fidelity URL
+      const localReel = { ...newReel, videoUrl: localVideoUrl };
+      setReels(prev => [localReel, ...prev]);
+
+      // Automatically post a matching Story so it is shown on the story feed immediately
+      const newStory: Story = {
+        id: 'story-from-reel-' + Date.now(),
+        userId: currentUser.uid,
+        username: currentUser.username,
+        profilePhoto: currentUser.profilePhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80',
+        mediaUrl: databaseVideoUrl || 'https://assets.mixkit.co/videos/preview/mixkit-undergrad-students-walking-on-school-campus-41618-large.mp4',
+        mediaType: 'video',
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours expiry
+      };
+
+      if (!isFirebaseMock) {
+        await setDoc(doc(db, 'stories', newStory.id), newStory);
+      }
+
+      if (typeof window !== 'undefined') {
+        (window as any)._localReelsCache[newStory.id] = localVideoUrl;
+      }
+
+      const localStory = { ...newStory, mediaUrl: localVideoUrl };
+      setStories(prev => [localStory, ...prev]);
 
       logActivity(
         currentUser.uid,
@@ -1796,6 +2000,13 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
   const uploadMediaFile = async (file: File, folder: string = 'posts'): Promise<string> => {
     if (isFirebaseMock) {
+      if (file.type.startsWith('video/') || file.size > 500 * 1024) {
+        try {
+          return URL.createObjectURL(file);
+        } catch (e) {
+          console.warn("Failed to create object URL, falling back:", e);
+        }
+      }
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -1811,7 +2022,14 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       const downloadUrl = await getDownloadURL(snapshot.ref);
       return downloadUrl;
     } catch (err) {
-      console.warn("Firebase Storage upload failed or not configured, falling back to base64 data URL:", err);
+      console.warn("Firebase Storage upload failed or not configured, falling back to object URL:", err);
+      if (file.type.startsWith('video/') || file.size > 500 * 1024) {
+        try {
+          return URL.createObjectURL(file);
+        } catch (e) {
+          console.warn("Failed to create object URL in fallback:", e);
+        }
+      }
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (e) => {

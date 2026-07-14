@@ -71,27 +71,49 @@ export default function SettingsView(props?: {
 
   // TRANSACTION & ORDERS STATE (Shared)
   const [orders, setOrders] = useState<any[]>(() => {
-    const saved = localStorage.getItem('collegio_orders');
-    return saved ? JSON.parse(saved) : [
-      { id: 'ORD-8921', item: 'Engineering Calculus Textbook', price: 35, date: '2026-06-01', status: 'Delivered' },
-      { id: 'ORD-2104', item: 'Computer Science Dept Gala Ticket', price: 15, date: '2026-06-05', status: 'Active' }
-    ];
+    try {
+      const saved = localStorage.getItem('collegio_orders');
+      return saved ? JSON.parse(saved) : [
+        { id: 'ORD-8921', item: 'Engineering Calculus Textbook', price: 35, date: '2026-06-01', status: 'Delivered' },
+        { id: 'ORD-2104', item: 'Computer Science Dept Gala Ticket', price: 15, date: '2026-06-05', status: 'Active' }
+      ];
+    } catch (e) {
+      console.warn(e);
+      return [
+        { id: 'ORD-8921', item: 'Engineering Calculus Textbook', price: 35, date: '2026-06-01', status: 'Delivered' },
+        { id: 'ORD-2104', item: 'Computer Science Dept Gala Ticket', price: 15, date: '2026-06-05', status: 'Active' }
+      ];
+    }
   });
 
   const saveOrders = (updated: any[]) => {
     setOrders(updated);
-    localStorage.setItem('collegio_orders', JSON.stringify(updated));
+    try {
+      localStorage.setItem('collegio_orders', JSON.stringify(updated));
+    } catch (e) {
+      console.warn("localStorage quota exceeded for orders:", e);
+    }
   };
 
   // 1. GROUPS STATE
   const [groups, setGroups] = useState<any[]>(() => {
-    const saved = localStorage.getItem('collegio_menu_groups');
-    return saved ? JSON.parse(saved) : [
-      { id: 'g1', name: 'Computer Science Study Hub', description: 'Exam preparation, group studies & programming debug sessions.', members: 42, joined: true, category: 'Academic' },
-      { id: 'g2', name: 'Campus Soccer Club', description: 'Weekly match circles and weekend friendly matches.', members: 89, joined: false, category: 'Sports' },
-      { id: 'g3', name: 'Design Guild & UI UX', description: 'Focusing on Figma skills, layout, and visual design workshops.', members: 24, joined: true, category: 'Design' },
-      { id: 'g4', name: 'Campus Board Games Society', description: 'Catan, chess, and cooperative multiplayer matches.', members: 31, joined: false, category: 'Social' }
-    ];
+    try {
+      const saved = localStorage.getItem('collegio_menu_groups');
+      return saved ? JSON.parse(saved) : [
+        { id: 'g1', name: 'Computer Science Study Hub', description: 'Exam preparation, group studies & programming debug sessions.', members: 42, joined: true, category: 'Academic' },
+        { id: 'g2', name: 'Campus Soccer Club', description: 'Weekly match circles and weekend friendly matches.', members: 89, joined: false, category: 'Sports' },
+        { id: 'g3', name: 'Design Guild & UI UX', description: 'Focusing on Figma skills, layout, and visual design workshops.', members: 24, joined: true, category: 'Design' },
+        { id: 'g4', name: 'Campus Board Games Society', description: 'Catan, chess, and cooperative multiplayer matches.', members: 31, joined: false, category: 'Social' }
+      ];
+    } catch (e) {
+      console.warn(e);
+      return [
+        { id: 'g1', name: 'Computer Science Study Hub', description: 'Exam preparation, group studies & programming debug sessions.', members: 42, joined: true, category: 'Academic' },
+        { id: 'g2', name: 'Campus Soccer Club', description: 'Weekly match circles and weekend friendly matches.', members: 89, joined: false, category: 'Sports' },
+        { id: 'g3', name: 'Design Guild & UI UX', description: 'Focusing on Figma skills, layout, and visual design workshops.', members: 24, joined: true, category: 'Design' },
+        { id: 'g4', name: 'Campus Board Games Society', description: 'Catan, chess, and cooperative multiplayer matches.', members: 31, joined: false, category: 'Social' }
+      ];
+    }
   });
 
   const [newGroupTitle, setNewGroupTitle] = useState('');
@@ -106,7 +128,11 @@ export default function SettingsView(props?: {
       return g;
     });
     setGroups(updated);
-    localStorage.setItem('collegio_menu_groups', JSON.stringify(updated));
+    try {
+      localStorage.setItem('collegio_menu_groups', JSON.stringify(updated));
+    } catch (e) {
+      console.warn(e);
+    }
   };
 
   const handleCreateGroupSubmit = (e: React.FormEvent) => {
@@ -122,7 +148,11 @@ export default function SettingsView(props?: {
     };
     const updated = [added, ...groups];
     setGroups(updated);
-    localStorage.setItem('collegio_menu_groups', JSON.stringify(updated));
+    try {
+      localStorage.setItem('collegio_menu_groups', JSON.stringify(updated));
+    } catch (e) {
+      console.warn(e);
+    }
     setNewGroupTitle('');
     setNewGroupDesc('');
   };
@@ -132,13 +162,23 @@ export default function SettingsView(props?: {
 
   // 3. MARKETPLACE STATE
   const [marketItems, setMarketItems] = useState<any[]>(() => {
-    const saved = localStorage.getItem('collegio_market_items');
-    return saved ? JSON.parse(saved) : [
-      { id: 'm1', name: 'Calculus 13th Edition Textbook', price: 40, category: 'Books', description: 'Slightly used with no written highlights. Perfect for incoming freshmen.', owner: 'Sarah Connor', phone: '+1 (555) 234-5678', photo: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=400&q=80' },
-      { id: 'm2', name: 'Dorm Mini Refrigerator', price: 75, category: 'Electronics', description: 'Extremely silent, keeps drinks ice cold. Fits perfectly under a desk.', owner: 'James Smith', phone: '+1 (555) 345-6789', photo: 'https://images.unsplash.com/photo-1585244433366-c8a49158fb75?auto=format&fit=crop&w=400&q=80' },
-      { id: 'm3', name: 'Solid Wood Ergonomic Chair', price: 60, category: 'Furniture', description: 'Adjustable back support and high cushion base. Excellent condition.', owner: 'Emily Davis', phone: '+1 (555) 456-7890', photo: 'https://images.unsplash.com/photo-1505797149-43b0069ec26b?auto=format&fit=crop&w=400&q=80' },
-      { id: 'm4', name: 'MacBook Air M1 2020 (8GB/256GB)', price: 420, category: 'Electronics', description: 'Battery health 88%. Includes original charger and student protective wrapper.', owner: 'Alex Mercer', phone: '+1 (555) 567-8901', photo: 'https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?auto=format&fit=crop&w=400&q=80' }
-    ];
+    try {
+      const saved = localStorage.getItem('collegio_market_items');
+      return saved ? JSON.parse(saved) : [
+        { id: 'm1', name: 'Calculus 13th Edition Textbook', price: 40, category: 'Books', description: 'Slightly used with no written highlights. Perfect for incoming freshmen.', owner: 'Sarah Connor', phone: '+1 (555) 234-5678', photo: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=400&q=80' },
+        { id: 'm2', name: 'Dorm Mini Refrigerator', price: 75, category: 'Electronics', description: 'Extremely silent, keeps drinks ice cold. Fits perfectly under a desk.', owner: 'James Smith', phone: '+1 (555) 345-6789', photo: 'https://images.unsplash.com/photo-1585244433366-c8a49158fb75?auto=format&fit=crop&w=400&q=80' },
+        { id: 'm3', name: 'Solid Wood Ergonomic Chair', price: 60, category: 'Furniture', description: 'Adjustable back support and high cushion base. Excellent condition.', owner: 'Emily Davis', phone: '+1 (555) 456-7890', photo: 'https://images.unsplash.com/photo-1505797149-43b0069ec26b?auto=format&fit=crop&w=400&q=80' },
+        { id: 'm4', name: 'MacBook Air M1 2020 (8GB/256GB)', price: 420, category: 'Electronics', description: 'Battery health 88%. Includes original charger and student protective wrapper.', owner: 'Alex Mercer', phone: '+1 (555) 567-8901', photo: 'https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?auto=format&fit=crop&w=400&q=80' }
+      ];
+    } catch (e) {
+      console.warn(e);
+      return [
+        { id: 'm1', name: 'Calculus 13th Edition Textbook', price: 40, category: 'Books', description: 'Slightly used with no written highlights. Perfect for incoming freshmen.', owner: 'Sarah Connor', phone: '+1 (555) 234-5678', photo: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=400&q=80' },
+        { id: 'm2', name: 'Dorm Mini Refrigerator', price: 75, category: 'Electronics', description: 'Extremely silent, keeps drinks ice cold. Fits perfectly under a desk.', owner: 'James Smith', phone: '+1 (555) 345-6789', photo: 'https://images.unsplash.com/photo-1585244433366-c8a49158fb75?auto=format&fit=crop&w=400&q=80' },
+        { id: 'm3', name: 'Solid Wood Ergonomic Chair', price: 60, category: 'Furniture', description: 'Adjustable back support and high cushion base. Excellent condition.', owner: 'Emily Davis', phone: '+1 (555) 456-7890', photo: 'https://images.unsplash.com/photo-1505797149-43b0069ec26b?auto=format&fit=crop&w=400&q=80' },
+        { id: 'm4', name: 'MacBook Air M1 2020 (8GB/256GB)', price: 420, category: 'Electronics', description: 'Battery health 88%. Includes original charger and student protective wrapper.', owner: 'Alex Mercer', phone: '+1 (555) 567-8901', photo: 'https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?auto=format&fit=crop&w=400&q=80' }
+      ];
+    }
   });
 
   const [marketFilter, setMarketFilter] = useState('All');
@@ -178,7 +218,11 @@ export default function SettingsView(props?: {
     };
     const updated = [added, ...marketItems];
     setMarketItems(updated);
-    localStorage.setItem('collegio_market_items', JSON.stringify(updated));
+    try {
+      localStorage.setItem('collegio_market_items', JSON.stringify(updated));
+    } catch (e) {
+      console.warn(e);
+    }
     setSellTitle('');
     setSellPrice('');
     setSellDesc('');
@@ -188,13 +232,23 @@ export default function SettingsView(props?: {
 
   // 4. PAGES STATE
   const [pages, setPages] = useState<any[]>(() => {
-    const saved = localStorage.getItem('collegio_menu_pages');
-    return saved ? JSON.parse(saved) : [
-      { id: 'p1', name: 'Collegio Student Union', likes: 1240, liked: true, category: 'Association' },
-      { id: 'p2', name: 'University Department of Engineering', likes: 852, liked: false, category: 'Education' },
-      { id: 'p3', name: 'Campus Nightlife Announcements', likes: 1954, liked: true, category: 'Social' },
-      { id: 'p4', name: 'Student Advisor & Career Center', likes: 432, liked: false, category: 'Advising' }
-    ];
+    try {
+      const saved = localStorage.getItem('collegio_menu_pages');
+      return saved ? JSON.parse(saved) : [
+        { id: 'p1', name: 'Collegio Student Union', likes: 1240, liked: true, category: 'Association' },
+        { id: 'p2', name: 'University Department of Engineering', likes: 852, liked: false, category: 'Education' },
+        { id: 'p3', name: 'Campus Nightlife Announcements', likes: 1954, liked: true, category: 'Social' },
+        { id: 'p4', name: 'Student Advisor & Career Center', likes: 432, liked: false, category: 'Advising' }
+      ];
+    } catch (e) {
+      console.warn(e);
+      return [
+        { id: 'p1', name: 'Collegio Student Union', likes: 1240, liked: true, category: 'Association' },
+        { id: 'p2', name: 'University Department of Engineering', likes: 852, liked: false, category: 'Education' },
+        { id: 'p3', name: 'Campus Nightlife Announcements', likes: 1954, liked: true, category: 'Social' },
+        { id: 'p4', name: 'Student Advisor & Career Center', likes: 432, liked: false, category: 'Advising' }
+      ];
+    }
   });
 
   const handleLikePage = (pageId: string) => {
@@ -205,7 +259,11 @@ export default function SettingsView(props?: {
       return p;
     });
     setPages(updated);
-    localStorage.setItem('collegio_menu_pages', JSON.stringify(updated));
+    try {
+      localStorage.setItem('collegio_menu_pages', JSON.stringify(updated));
+    } catch (e) {
+      console.warn(e);
+    }
   };
 
   // 5. MEMORIES STATE -> filter posts written by active student
@@ -231,12 +289,21 @@ export default function SettingsView(props?: {
 
   // 7. EVENTS STATE
   const [campusEvents, setCampusEvents] = useState<any[]>(() => {
-    const saved = localStorage.getItem('collegio_menu_events');
-    return saved ? JSON.parse(saved) : [
-      { id: 'e1', title: 'Grand Graduation Gala', date: 'June 15, 2026', time: '18:00', location: 'University Great Hall', rsvps: 231, status: 'Interested' },
-      { id: 'e2', title: 'Fintech Student Hackathon 2026', date: 'June 20, 2026', time: '09:00', location: 'Science Annex Tower B', rsvps: 114, status: 'Attending' },
-      { id: 'e3', title: 'Summer Welcome Bonfire', date: 'June 25, 2026', time: '20:30', location: 'South Campus Lawn', rsvps: 345, status: 'Not Going' }
-    ];
+    try {
+      const saved = localStorage.getItem('collegio_menu_events');
+      return saved ? JSON.parse(saved) : [
+        { id: 'e1', title: 'Grand Graduation Gala', date: 'June 15, 2026', time: '18:00', location: 'University Great Hall', rsvps: 231, status: 'Interested' },
+        { id: 'e2', title: 'Fintech Student Hackathon 2026', date: 'June 20, 2026', time: '09:00', location: 'Science Annex Tower B', rsvps: 114, status: 'Attending' },
+        { id: 'e3', title: 'Summer Welcome Bonfire', date: 'June 25, 2026', time: '20:30', location: 'South Campus Lawn', rsvps: 345, status: 'Not Going' }
+      ];
+    } catch (e) {
+      console.warn(e);
+      return [
+        { id: 'e1', title: 'Grand Graduation Gala', date: 'June 15, 2026', time: '18:00', location: 'University Great Hall', rsvps: 231, status: 'Interested' },
+        { id: 'e2', title: 'Fintech Student Hackathon 2026', date: 'June 20, 2026', time: '09:00', location: 'Science Annex Tower B', rsvps: 114, status: 'Attending' },
+        { id: 'e3', title: 'Summer Welcome Bonfire', date: 'June 25, 2026', time: '20:30', location: 'South Campus Lawn', rsvps: 345, status: 'Not Going' }
+      ];
+    }
   });
 
   const handleRSVP = (eventId: string, rsvpType: string) => {
@@ -250,16 +317,28 @@ export default function SettingsView(props?: {
       return e;
     });
     setCampusEvents(updated);
-    localStorage.setItem('collegio_menu_events', JSON.stringify(updated));
+    try {
+      localStorage.setItem('collegio_menu_events', JSON.stringify(updated));
+    } catch (e) {
+      console.warn(e);
+    }
   };
 
   // 8. ADS MANAGER STATE
   const [clubAds, setClubAds] = useState<any[]>(() => {
-    const saved = localStorage.getItem('collegio_club_ads');
-    return saved ? JSON.parse(saved) : [
-      { id: 'ad1', headline: 'Need Coding Buddies? Join ACM!', budget: 15, impressions: 1420, clicks: 104, CTR: '7.3%', active: true },
-      { id: 'ad2', headline: 'Board Games Pizza Night - Friday', budget: 10, impressions: 850, clicks: 42, CTR: '4.9%', active: true }
-    ];
+    try {
+      const saved = localStorage.getItem('collegio_club_ads');
+      return saved ? JSON.parse(saved) : [
+        { id: 'ad1', headline: 'Need Coding Buddies? Join ACM!', budget: 15, impressions: 1420, clicks: 104, CTR: '7.3%', active: true },
+        { id: 'ad2', headline: 'Board Games Pizza Night - Friday', budget: 10, impressions: 850, clicks: 42, CTR: '4.9%', active: true }
+      ];
+    } catch (e) {
+      console.warn(e);
+      return [
+        { id: 'ad1', headline: 'Need Coding Buddies? Join ACM!', budget: 15, impressions: 1420, clicks: 104, CTR: '7.3%', active: true },
+        { id: 'ad2', headline: 'Board Games Pizza Night - Friday', budget: 10, impressions: 850, clicks: 42, CTR: '4.9%', active: true }
+      ];
+    }
   });
 
   const [adHeadline, setAdHeadline] = useState('');
@@ -280,7 +359,11 @@ export default function SettingsView(props?: {
     };
     const updated = [added, ...clubAds];
     setClubAds(updated);
-    localStorage.setItem('collegio_club_ads', JSON.stringify(updated));
+    try {
+      localStorage.setItem('collegio_club_ads', JSON.stringify(updated));
+    } catch (e) {
+      console.warn(e);
+    }
     setAdHeadline('');
     alert('Study Flyer Campaign launched! Watch your club flyer reach peer feeds.');
   };
@@ -315,7 +398,11 @@ export default function SettingsView(props?: {
   const [gameBalloons, setGameBalloons] = useState<any[]>([]);
   const [gameTimeLeft, setGameTimeLeft] = useState(15);
   const [highScore, setHighScore] = useState(() => {
-    return parseInt(localStorage.getItem('collegio_game_highscore') || '0', 10);
+    try {
+      return parseInt(localStorage.getItem('collegio_game_highscore') || '0', 10);
+    } catch (e) {
+      return 0;
+    }
   });
 
   const startGame = () => {
@@ -382,7 +469,11 @@ export default function SettingsView(props?: {
         const next = prev + 10;
         if (next > highScore) {
           setHighScore(next);
-          localStorage.setItem('collegio_game_highscore', next.toString());
+          try {
+            localStorage.setItem('collegio_game_highscore', next.toString());
+          } catch (e) {
+            console.warn(e);
+          }
         }
         return next;
       });
@@ -395,10 +486,17 @@ export default function SettingsView(props?: {
 
   // 12. SUPPORT INBOX STATE
   const [supportTickets, setSupportTickets] = useState<any[]>(() => {
-    const saved = localStorage.getItem('collegio_support_tickets');
-    return saved ? JSON.parse(saved) : [
-      { id: 'TKT-102', subject: 'In-app notification delay', message: 'I cannot see immediately when my friend reviews my post.', status: 'Closed', reply: 'We optimized firestore listeners. It compiles instantly now.', date: '2026-06-03' }
-    ];
+    try {
+      const saved = localStorage.getItem('collegio_support_tickets');
+      return saved ? JSON.parse(saved) : [
+        { id: 'TKT-102', subject: 'In-app notification delay', message: 'I cannot see immediately when my friend reviews my post.', status: 'Closed', reply: 'We optimized firestore listeners. It compiles instantly now.', date: '2026-06-03' }
+      ];
+    } catch (e) {
+      console.warn(e);
+      return [
+        { id: 'TKT-102', subject: 'In-app notification delay', message: 'I cannot see immediately when my friend reviews my post.', status: 'Closed', reply: 'We optimized firestore listeners. It compiles instantly now.', date: '2026-06-03' }
+      ];
+    }
   });
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketMsg, setTicketMsg] = useState('');
@@ -416,7 +514,11 @@ export default function SettingsView(props?: {
     };
     const updated = [added, ...supportTickets];
     setSupportTickets(updated);
-    localStorage.setItem('collegio_support_tickets', JSON.stringify(updated));
+    try {
+      localStorage.setItem('collegio_support_tickets', JSON.stringify(updated));
+    } catch (e) {
+      console.warn(e);
+    }
     setTicketSubject('');
     setTicketMsg('');
     alert('Academic Support Advisor response registered! Check response below shortly.');

@@ -1,6 +1,6 @@
 {
   "name": "Ti Connect",
   "description": "The premier global social ecosystem to connect, share, and establish professional relationships worldwide.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["camera", "microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -9,7 +9,7 @@ import { Post, Story, Comment } from '../types';
 import { 
   Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, 
   Plus, X, Send, MapPin, Smile, Flag, Calendar, Trash2,
-  Video, Users, UserPlus
+  Video, Users, UserPlus, ChevronUp, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -62,6 +62,8 @@ export default function HomeFeedView() {
   const [storyProgress, setStoryProgress] = useState(0);
   const storyInterval = useRef<any>(null);
   const storyFileInputRef = useRef<HTMLInputElement>(null);
+  const storyTouchStartY = useRef<number | null>(null);
+  const storyLastScrollTime = useRef<number>(0);
 
   const startStoryTimer = () => {
     setStoryProgress(0);
@@ -81,6 +83,24 @@ export default function HomeFeedView() {
   const handleOpenStory = (story: Story) => {
     setActiveStory(story);
     startStoryTimer();
+  };
+
+  const activeStoryIndex = stories.findIndex(s => s.id === activeStory?.id);
+
+  const handleNextStory = () => {
+    if (activeStoryIndex !== -1 && activeStoryIndex < stories.length - 1) {
+      setActiveStory(stories[activeStoryIndex + 1]);
+      startStoryTimer();
+    } else {
+      handleCloseStory();
+    }
+  };
+
+  const handlePrevStory = () => {
+    if (activeStoryIndex > 0) {
+      setActiveStory(stories[activeStoryIndex - 1]);
+      startStoryTimer();
+    }
   };
 
   const handleCloseStory = () => {
@@ -130,8 +150,13 @@ export default function HomeFeedView() {
   };
 
   // Group stories by user to make an elegant list like Instagram
+  // Only display and show the current video upload the user uploaded on the story feed page
+  const filteredStoriesForFeed = stories.filter(
+    s => s.userId === currentUser?.uid && s.mediaType === 'video'
+  );
+
   const groupedStories: { [userId: string]: Story[] } = {};
-  stories.forEach(s => {
+  filteredStoriesForFeed.forEach(s => {
     if (!groupedStories[s.userId]) {
       groupedStories[s.userId] = [];
     }
@@ -683,13 +708,38 @@ export default function HomeFeedView() {
       <AnimatePresence>
         {activeStory && (
           <motion.div 
-            className="fixed inset-0 bg-black z-50 flex flex-col justify-between"
+            className="fixed inset-0 bg-black z-50 flex flex-col justify-between touch-none"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
+            onWheel={(e) => {
+              const now = Date.now();
+              if (now - storyLastScrollTime.current < 750) return;
+              if (e.deltaY > 15) {
+                handleNextStory();
+                storyLastScrollTime.current = now;
+              } else if (e.deltaY < -15) {
+                handlePrevStory();
+                storyLastScrollTime.current = now;
+              }
+            }}
+            onTouchStart={(e) => {
+              storyTouchStartY.current = e.touches[0].clientY;
+            }}
+            onTouchEnd={(e) => {
+              if (storyTouchStartY.current === null) return;
+              const touchEndY = e.changedTouches[0].clientY;
+              const diff = touchEndY - storyTouchStartY.current;
+              if (diff < -30) {
+                handleNextStory();
+              } else if (diff > 30) {
+                handlePrevStory();
+              }
+              storyTouchStartY.current = null;
+            }}
           >
             {/* Story loading top headers */}
-            <div className="p-4 flex flex-col gap-3">
+            <div className="p-4 flex flex-col gap-3 z-20">
               {/* Progress bars */}
               <div className="w-full h-1 bg-white/20 rounded-full overflow-hidden">
                 <div 
@@ -708,29 +758,59 @@ export default function HomeFeedView() {
                     referrerPolicy="no-referrer"
                   />
                   <div>
-                    <h5 className="font-extrabold text-sm text-shadow">{activeStory.username}</h5>
+                    <h5 className="font-extrabold text-sm text-shadow">@{activeStory.username}</h5>
                     <p className="text-[10px] text-white/60 font-bold uppercase">Daily Update</p>
                   </div>
                 </div>
 
-                <button onClick={handleCloseStory} className="text-white hover:text-cyan-400 p-1">
+                <button onClick={handleCloseStory} className="text-white hover:text-cyan-400 p-1 cursor-pointer">
                   <X className="w-6 h-6" />
                 </button>
               </div>
             </div>
 
-            {/* Story Image container */}
+            {/* Story Image or Video container */}
             <div className="flex-1 flex items-center justify-center p-2 relative">
-              <img 
-                src={activeStory.mediaUrl} 
-                alt="Story visual content" 
-                className="max-h-[80vh] rounded-3xl object-contain shadow-2xl"
-                referrerPolicy="no-referrer"
-              />
+              {/* Left Hand Floating Navigation Arrows for sliding */}
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-3.5 z-30">
+                <button
+                  disabled={activeStoryIndex === 0}
+                  onClick={(e) => { e.stopPropagation(); handlePrevStory(); }}
+                  className="p-2.5 rounded-full bg-black/60 hover:bg-black/80 text-white border border-white/10 disabled:opacity-25 disabled:pointer-events-none transition-all active:scale-95 cursor-pointer"
+                  title="Slide Up (Previous Story)"
+                >
+                  <ChevronUp className="w-5 h-5 stroke-[3]" />
+                </button>
+                <button
+                  disabled={activeStoryIndex === stories.length - 1}
+                  onClick={(e) => { e.stopPropagation(); handleNextStory(); }}
+                  className="p-2.5 rounded-full bg-black/60 hover:bg-black/80 text-white border border-white/10 disabled:opacity-25 disabled:pointer-events-none transition-all active:scale-95 cursor-pointer"
+                  title="Slide Down (Next Story)"
+                >
+                  <ChevronDown className="w-5 h-5 stroke-[3]" />
+                </button>
+              </div>
+
+              {activeStory.mediaType === 'video' ? (
+                <video 
+                  src={activeStory.mediaUrl} 
+                  autoPlay
+                  controls
+                  playsInline
+                  className="max-h-[80vh] rounded-3xl object-contain shadow-2xl w-full max-w-lg z-10"
+                />
+              ) : (
+                <img 
+                  src={activeStory.mediaUrl} 
+                  alt="Story visual content" 
+                  className="max-h-[80vh] rounded-3xl object-contain shadow-2xl z-10"
+                  referrerPolicy="no-referrer"
+                />
+              )}
             </div>
 
             {/* Bottom response bar simulation */}
-            <div className="p-6 bg-gradient-to-t from-black via-black/80 to-transparent flex items-center gap-4">
+            <div className="p-6 bg-gradient-to-t from-black via-black/80 to-transparent flex items-center gap-4 z-20">
               <input 
                 type="text" 
                 placeholder="Send a supportive response..."

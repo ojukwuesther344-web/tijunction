@@ -241,7 +241,7 @@ export default function ProfileView({ altTargetUid, onClearTarget, openSettingsT
             }`}
           >
             <Eye className="w-4.5 h-4.5" />
-            <span>Stories ({userStories.length})</span>
+            <span>Stories & Video Records ({userStories.length})</span>
           </button>
 
           {isMe && (
@@ -308,10 +308,59 @@ export default function ProfileView({ altTargetUid, onClearTarget, openSettingsT
         {activeTab === 'stories' && (
           <div className="grid grid-cols-2 gap-3">
             {userStories.map(story => (
-              <div key={story.id} className="relative rounded-2xl overflow-hidden shadow bg-slate-100 border h-44">
-                <img src={story.mediaUrl} alt="active story" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                <div className="absolute bottom-2 left-2 right-2 bg-black/60 p-1 rounded text-[9px] font-bold text-white text-center">
-                  Expires in 24h
+              <div key={story.id} className="relative rounded-2xl overflow-hidden shadow-sm bg-slate-100 border border-slate-150 h-56 flex flex-col group">
+                <div className="relative flex-1 overflow-hidden">
+                  {story.mediaType === 'video' ? (
+                    <div className="w-full h-full relative bg-black">
+                      <video 
+                        src={story.mediaUrl} 
+                        className="w-full h-full object-cover" 
+                        autoPlay 
+                        loop 
+                        muted 
+                        playsInline 
+                        onError={(e) => {
+                          console.warn("Story video failed to load, falling back to stable campus loop:", story.mediaUrl);
+                          const fallbacks = [
+                            'https://assets.mixkit.co/videos/preview/mixkit-undergrad-students-walking-on-school-campus-41618-large.mp4',
+                            'https://assets.mixkit.co/videos/preview/mixkit-web-designer-working-on-his-laptop-at-home-vertical-40292-large.mp4',
+                            'https://assets.mixkit.co/videos/preview/mixkit-group-of-friends-having-fun-at-a-music-festival-vertical-39745-large.mp4'
+                          ];
+                          const fallbackUrl = fallbacks[Math.floor(Math.random() * fallbacks.length)];
+                          if (e.currentTarget.src !== fallbackUrl) {
+                            e.currentTarget.src = fallbackUrl;
+                          }
+                        }}
+                      />
+                      <div className="absolute top-2 left-2 z-10">
+                        <span className="text-[8px] font-black uppercase tracking-wider bg-pink-500 text-white px-2 py-0.5 rounded-full border border-pink-400/30">
+                          🎥 Video Record
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-full h-full relative">
+                      <img 
+                        src={story.mediaUrl} 
+                        alt="Story content" 
+                        className="w-full h-full object-cover" 
+                        referrerPolicy="no-referrer" 
+                      />
+                      <div className="absolute top-2 left-2 z-10">
+                        <span className="text-[8px] font-black uppercase tracking-wider bg-cyan-500 text-white px-2 py-0.5 rounded-full border border-cyan-400/30">
+                          Story
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="p-2.5 bg-white border-t flex flex-col gap-0.5">
+                  <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">
+                    Campus Archive Record
+                  </span>
+                  <span className="text-[10px] text-slate-600 font-bold">
+                    Posted: {new Date(story.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
                 </div>
               </div>
             ))}
@@ -319,7 +368,7 @@ export default function ProfileView({ altTargetUid, onClearTarget, openSettingsT
             {userStories.length === 0 && (
               <div className="col-span-2 text-center py-12 text-slate-400 bg-white rounded-2xl border p-6">
                 <EyeOff className="w-10 h-10 stroke-1 mx-auto mb-2" />
-                <p className="text-sm font-semibold">No active 24h stories shared.</p>
+                <p className="text-sm font-semibold">No active stories or video records shared.</p>
               </div>
             )}
           </div>
