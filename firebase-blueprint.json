@@ -195,6 +195,71 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "userId", "activityType", "activityDetails", "createdAt"]
+    },
+    "LiveStream": {
+      "title": "LiveStream",
+      "description": "Active or completed live video stream",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "username": { "type": "string" },
+        "profilePhoto": { "type": "string" },
+        "status": { "type": "string", "enum": ["live", "ended"] },
+        "viewerCount": { "type": "integer" },
+        "likesCount": { "type": "integer" },
+        "duration": { "type": "integer" },
+        "streamMode": { "type": "string", "enum": ["camera", "vlog"] },
+        "currentVlogIndex": { "type": "integer" },
+        "isFilterActive": { "type": "boolean" },
+        "isFlashOn": { "type": "boolean" },
+        "micMuted": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "endedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "username", "status", "createdAt"]
+    },
+    "LiveComment": {
+      "title": "LiveComment",
+      "description": "Real-time comment during a live stream",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "streamId": { "type": "string" },
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "profilePhoto": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "streamId", "userId", "username", "text", "createdAt"]
+    },
+    "LiveLike": {
+      "title": "LiveLike",
+      "description": "Like reaction on a live stream",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "streamId": { "type": "string" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "streamId", "userId", "createdAt"]
+    },
+    "LiveViewer": {
+      "title": "LiveViewer",
+      "description": "Viewer active heartbeat record inside a live stream",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "streamId": { "type": "string" },
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "profilePhoto": { "type": "string" },
+        "lastActive": { "type": "integer" }
+      },
+      "required": ["id", "streamId", "userId", "username", "lastActive"]
     }
   },
   "firestore": {
@@ -245,6 +310,22 @@
     "userActivities": {
       "schema": "UserActivity",
       "description": "Live global user activities"
+    },
+    "liveStreams": {
+      "schema": "LiveStream",
+      "description": "Active live streams"
+    },
+    "liveComments": {
+      "schema": "LiveComment",
+      "description": "Real-time comments for active streams"
+    },
+    "liveLikes": {
+      "schema": "LiveLike",
+      "description": "Real-time likes for active streams"
+    },
+    "liveViewers": {
+      "schema": "LiveViewer",
+      "description": "Viewer heartbeats in active streams"
     }
   }
 }

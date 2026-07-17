@@ -7,13 +7,65 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useSocial } from '../context/SocialContext';
 import { Reel } from '../types';
 import { 
+  collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, limit, increment, getDocs 
+} from 'firebase/firestore';
+import { db, isFirebaseMock, auth } from '../firebase';
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
+
+function handleLiveFirestoreError(error: unknown, operationType: OperationType, path: string | null, currentUserId?: string) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid || currentUserId,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+import { 
   Heart, MessageSquare, Share2, Upload, X, Play, Music, Volume2, VolumeX, Sparkles, ArrowLeft,
-  ChevronUp, ChevronDown, Radio, Camera, RefreshCw, Users, Mic, MicOff, Send, HelpCircle
+  ChevronUp, ChevronDown, Radio, Camera, RefreshCw, Users, Mic, MicOff, Send, HelpCircle,
+  Smile, UserPlus, MessageCircle, Zap, Gift, Video, VideoOff, MoreVertical, Wifi
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function ShortsView() {
-  const { reels, createReel, toggleLikeReel, currentUser, setActiveTab, uploadMediaFile } = useSocial();
+  const { reels, createReel, toggleLikeReel, currentUser, setActiveTab, uploadMediaFile, activeLiveStreamId, setActiveLiveStreamId } = useSocial();
   const [activeReelIdx, setActiveReelIdx] = useState(0);
   const [direction, setDirection] = useState(0); // -1 for up (previous), 1 for down (next)
   const [isMuted, setIsMuted] = useState(true);
@@ -670,10 +722,14 @@ export default function ShortsView() {
 
       {/* ACTIVE LIVE VIDEO STREAMING OVERLAY */}
       <AnimatePresence>
-        {showLiveStream && (
+        {(showLiveStream || activeLiveStreamId) && (
           <LiveStreamOverlay 
-            onClose={() => setShowLiveStream(false)} 
+            onClose={() => {
+              setShowLiveStream(false);
+              setActiveLiveStreamId(null);
+            }} 
             currentUser={currentUser} 
+            streamId={activeLiveStreamId}
           />
         )}
       </AnimatePresence>
@@ -687,96 +743,127 @@ export default function ShortsView() {
 interface LiveStreamOverlayProps {
   onClose: () => void;
   currentUser: any;
+  streamId?: string | null;
 }
 
-function LiveStreamOverlay({ onClose, currentUser }: LiveStreamOverlayProps) {
-  const [isCounting, setIsCounting] = useState(true);
+interface HeartItem {
+  id: string;
+  emoji: string;
+  x: number;
+  scale: number;
+}
+
+function LiveStreamOverlay({ onClose, currentUser, streamId }: LiveStreamOverlayProps) {
+  const isViewer = !!streamId;
+  const activeStreamId = useRef(streamId || 'stream-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7)).current;
+
+  // States
+  const [isLive, setIsLive] = useState(isViewer); // Viewers are live instantly; Broadcasters start in Pre-Live Preview
+  const [isCounting, setIsCounting] = useState(false);
   const [countdown, setCountdown] = useState<number | string>(3);
   const [duration, setDuration] = useState(0);
-  const [viewerCount, setViewerCount] = useState(1324);
-  const [liveComments, setLiveComments] = useState<any[]>([
-    { id: 'start-1', username: 'alex_academic', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=150&h=150&q=80', text: 'Hey! Is the live stream up? campus looks amazing! 🎓' },
-    { id: 'start-2', username: 'david_dev', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80', text: 'Stunning broadcast feed quality! Let\'s connect' },
-    { id: 'start-3', username: 'emma_eng', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80', text: 'Wow, is there an orientation going on? 🏫' },
-  ]);
+  const [viewerCount, setViewerCount] = useState(isViewer ? 1 : 1);
+  const [liveComments, setLiveComments] = useState<any[]>([]);
+  const [activeComments, setActiveComments] = useState<any[]>([]); // comments in the last 8 seconds to support automatic fade-out
   const [newCommentText, setNewCommentText] = useState('');
-  const [floatingHearts, setFloatingHearts] = useState<any[]>([]);
-  const [totalLikes, setTotalLikes] = useState(48);
+  const [floatingHearts, setFloatingHearts] = useState<HeartItem[]>([]);
+  const [totalLikes, setTotalLikes] = useState(0);
   const [liveAudioMuted, setLiveAudioMuted] = useState(false);
+  const [cameraMuted, setCameraMuted] = useState(false);
   const [isFrontCamera, setIsFrontCamera] = useState(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [showEndSummary, setShowEndSummary] = useState(false);
+  const [isFlashOn, setIsFlashOn] = useState(false);
+  const [isFilterActive, setIsFilterActive] = useState(false);
+  const [broadcaster, setBroadcaster] = useState<any>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showGiftsPanel, setShowGiftsPanel] = useState(false);
+
+  const [streamMode, setStreamMode] = useState<'camera' | 'vlog'>(isViewer ? 'vlog' : 'camera');
+  const [currentVlogIndex, setCurrentVlogIndex] = useState(0);
+  const [micLevels, setMicLevels] = useState<number[]>([4, 8, 12, 16, 12, 8, 4]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
 
-  // 3-2-1 Countdown Logic
-  useEffect(() => {
-    if (!isCounting) return;
-    const timer = setInterval(() => {
-      setCountdown(prev => {
-        if (prev === 3) return 2;
-        if (prev === 2) return 1;
-        if (prev === 1) return 'GO!';
-        setIsCounting(false);
-        clearInterval(timer);
-        return '';
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [isCounting]);
+  const vlogLoops = [
+    'https://assets.mixkit.co/videos/preview/mixkit-young-man-walking-and-vlogging-with-his-phone-vertical-40291-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-happy-girl-vlogging-while-walking-vertical-40285-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-man-recording-himself-with-his-phone-vertical-40286-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-influencer-recording-a-video-with-her-phone-vertical-40284-large.mp4'
+  ];
 
-  // Live stream ticking timer
+  // 1. Audio equalizer simulation
   useEffect(() => {
-    if (isCounting || showEndSummary) return;
+    if (showEndSummary || !isLive) return;
+    const interval = setInterval(() => {
+      setMicLevels(prev => prev.map(() => Math.floor(Math.random() * 20) + 4));
+    }, 120);
+    return () => clearInterval(interval);
+  }, [showEndSummary, isLive]);
+
+  // 2. Swirling live stream ticker timer (Broadcasters update duration field every 5 seconds)
+  useEffect(() => {
+    if (showEndSummary || !isLive) return;
     const timer = setInterval(() => {
       setDuration(prev => prev + 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, [isCounting, showEndSummary]);
+  }, [showEndSummary, isLive]);
 
-  // Fluctuating view count simulation
+  // 3. Request camera and microphone permissions immediately on mount for broadcaster
   useEffect(() => {
-    if (isCounting || showEndSummary) return;
-    const interval = setInterval(() => {
-      setViewerCount(prev => {
-        const delta = Math.floor(Math.random() * 15) - 7;
-        const newCount = prev + delta;
-        return newCount > 0 ? newCount : 100;
-      });
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [isCounting, showEndSummary]);
-
-  // Real Camera capture stream with sandbox-safe error handling
-  useEffect(() => {
-    if (isCounting || showEndSummary) return;
+    if (showEndSummary || isViewer) return;
     let activeStream: MediaStream | null = null;
 
     async function startCamera() {
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error("UserMedia APIs not supported in this browser context.");
+          throw new Error("Camera and Microphone APIs are not supported in this browser.");
         }
+        
+        // Ask for camera and microphone permissions
         const constraints = {
           video: { 
             facingMode: isFrontCamera ? 'user' : 'environment',
-            width: { ideal: 640 },
-            height: { ideal: 1136 }
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
           },
-          audio: !liveAudioMuted
+          audio: true
         };
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+        let stream: MediaStream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (err) {
+          console.warn("Standard camera constraints failed. Attempting audio & video fallback.", err);
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: isFrontCamera ? 'user' : 'environment' },
+              audio: true
+            });
+          } catch (err2) {
+            console.warn("Audio/Video fallback failed. Requesting video-only fallback.", err2);
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: true,
+              audio: false
+            });
+          }
+        }
+
         activeStream = stream;
         setCameraStream(stream);
         setCameraError(null);
+        setStreamMode('camera'); // Successfully bound to real hardware!
+        
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
       } catch (err) {
-        console.warn("Camera hardware access is restricted or unsupported in this sandbox:", err);
+        console.warn("Camera hardware access is not available, falling back to simulated stream:", err);
         setCameraError(err instanceof Error ? err.message : String(err));
+        setStreamMode('vlog'); // Fall back to interactive pre-recorded vlog simulation
       }
     }
 
@@ -791,90 +878,494 @@ function LiveStreamOverlay({ onClose, currentUser }: LiveStreamOverlayProps) {
         });
       }
     };
-  }, [isCounting, showEndSummary, isFrontCamera, liveAudioMuted]);
+  }, [showEndSummary, isFrontCamera, isViewer]);
 
-  // Simulated peer campus comments popping in every few seconds
+  // Ensure camera streams stay connected to video ref when mounted
   useEffect(() => {
-    if (isCounting || showEndSummary) return;
+    if (videoRef.current && cameraStream && streamMode === 'camera' && !isViewer) {
+      videoRef.current.srcObject = cameraStream;
+    }
+  }, [cameraStream, streamMode, isViewer]);
 
-    const simulatedNames = ['alex_academic', 'sarah_stewart', 'david_dev', 'emma_engineering', 'marcus_global', 'elena_law', 'sam_science', 'liam_lingua', 'sophia_social'];
+  // Enable / disable video tracks
+  useEffect(() => {
+    if (cameraStream) {
+      cameraStream.getVideoTracks().forEach(track => {
+        track.enabled = !cameraMuted;
+      });
+    }
+  }, [cameraMuted, cameraStream]);
+
+  // Enable / disable audio tracks
+  useEffect(() => {
+    if (cameraStream) {
+      cameraStream.getAudioTracks().forEach(track => {
+        track.enabled = !liveAudioMuted;
+      });
+    }
+  }, [liveAudioMuted, cameraStream]);
+
+  // 4. Simulated peer commentary (Mock Mode only)
+  useEffect(() => {
+    if (!isLive || showEndSummary || !isFirebaseMock) return;
+
+    const simulatedNames = ['john_doe', 'sarah_m', 'alex_stud', 'campus_star', 'linda_k', 'emma_w', 'david_web', 'clover_g'];
     const simulatedAvatars = [
       'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=150&h=150&q=80',
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80',
       'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80',
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80',
       'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?auto=format&fit=crop&w=150&h=150&q=80',
       'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=150&h=150&q=80'
     ];
     const simulatedTexts = [
-      'Amazing stream! Let\'s establish a professional network! 🤝',
-      'Which course are you studying? 📚',
-      'Greetings from the computer science lab!',
-      'TI Connect is turning into a global family! 🌍',
-      'The live video quality looks super sharp!',
-      'Is there a study group starting soon? 🎓',
-      'Love this feature, live stream on campus is gold!',
-      'Please show the global feed center! ✨',
-      'Can you pin the group link?',
-      'Awesome live broadcast! keep it up! 👍',
-      'What a lovely sunset over the campus grounds! 🌅'
+      'Love the stream! 🔥🔥🔥',
+      'This camera filter looks incredible!',
+      'Where are you broadcasting from? 🎓',
+      'Awesome study vibe today! 📚✨',
+      'Can you study together tomorrow? 💡',
+      'TI Connect LIVE is super fast!',
+      'Incredible! Say hello to David 👑',
+      'This full-screen feed is stunning 💖'
     ];
 
-    const commentTimer = setInterval(() => {
+    const commentInterval = setInterval(() => {
       const randomUser = simulatedNames[Math.floor(Math.random() * simulatedNames.length)];
       const randomAvatar = simulatedAvatars[Math.floor(Math.random() * simulatedAvatars.length)];
       const randomText = simulatedTexts[Math.floor(Math.random() * simulatedTexts.length)];
       
-      setLiveComments(prev => [
-        ...prev,
-        {
-          id: String(Date.now() + Math.random()),
-          username: randomUser,
-          avatar: randomAvatar,
-          text: randomText,
-          isMe: false
-        }
-      ]);
+      const newComment = {
+        id: 'mock-cmt-' + Date.now() + '-' + Math.random(),
+        username: randomUser,
+        avatar: randomAvatar,
+        text: randomText,
+        isMe: false,
+        timestamp: Date.now()
+      };
+
+      setLiveComments(prev => [...prev, newComment]);
+    }, 4500);
+
+    return () => clearInterval(commentInterval);
+  }, [isLive, showEndSummary]);
+
+  // Fluctuating view count (Mock Mode only)
+  useEffect(() => {
+    if (!isLive || showEndSummary || !isFirebaseMock) return;
+    setViewerCount(isViewer ? 421 : 129);
+    const interval = setInterval(() => {
+      setViewerCount(prev => {
+        const delta = Math.floor(Math.random() * 9) - 4;
+        const newCount = prev + delta;
+        return newCount > 1 ? newCount : 12;
+      });
     }, 4000);
+    return () => clearInterval(interval);
+  }, [isLive, showEndSummary]);
 
-    return () => clearInterval(commentTimer);
-  }, [isCounting, showEndSummary]);
+  // 5. Firestore real-time synchronization for LIVE broadcasters and viewers
+  useEffect(() => {
+    if (!isLive || showEndSummary) return;
 
-  // Autoscroll comments list to bottom
+    if (!isFirebaseMock) {
+      if (!isViewer) {
+        // Broadcaster initializes the stream document
+        const streamRef = doc(db, 'liveStreams', activeStreamId);
+        setDoc(streamRef, {
+          id: activeStreamId,
+          userId: currentUser?.uid || 'anonymous',
+          fullName: currentUser?.fullName || '',
+          username: currentUser?.username || 'me_student',
+          profilePhoto: currentUser?.profilePhoto || '',
+          status: 'live',
+          viewerCount: 1,
+          likesCount: totalLikes,
+          duration: 0,
+          streamMode: streamMode,
+          currentVlogIndex,
+          isFilterActive,
+          isFlashOn,
+          micMuted: liveAudioMuted,
+          createdAt: new Date().toISOString()
+        }).catch(err => {
+          console.error("Failed to initialize liveStream doc:", err);
+        });
+
+        // Periodic update of duration
+        const durationInterval = setInterval(() => {
+          updateDoc(streamRef, {
+            duration: increment(5)
+          }).catch(() => {});
+        }, 5000);
+
+        return () => {
+          clearInterval(durationInterval);
+          // Set stream status to ended
+          updateDoc(streamRef, {
+            status: 'ended',
+            endedAt: new Date().toISOString()
+          }).catch(() => {});
+        };
+      } else {
+        // Viewer subscribes to active stream document
+        const streamRef = doc(db, 'liveStreams', activeStreamId);
+        const unsubscribe = onSnapshot(streamRef, (snapshot) => {
+          if (snapshot.exists()) {
+            const data = snapshot.data();
+            if (data.status === 'ended') {
+              setShowEndSummary(true);
+            } else {
+              setViewerCount(data.viewerCount || 1);
+              setTotalLikes(data.likesCount || 0);
+              setDuration(data.duration || 0);
+              setBroadcaster({
+                uid: data.userId,
+                fullName: data.fullName,
+                username: data.username,
+                profilePhoto: data.profilePhoto
+              });
+              setIsFilterActive(!!data.isFilterActive);
+              setIsFlashOn(!!data.isFlashOn);
+              setLiveAudioMuted(!!data.micMuted);
+              if (data.streamMode) {
+                setStreamMode(data.streamMode);
+              }
+              if (data.currentVlogIndex !== undefined) {
+                setCurrentVlogIndex(data.currentVlogIndex);
+              }
+            }
+          } else {
+            setShowEndSummary(true);
+          }
+        }, (error) => {
+          console.error("Error subscribing to liveStream:", error);
+        });
+
+        // Periodic heartbeat for viewers
+        const heartbeatId = currentUser?.uid + '_' + activeStreamId;
+        const heartbeatRef = doc(db, 'liveViewers', heartbeatId);
+        
+        const writeHeartbeat = () => {
+          setDoc(heartbeatRef, {
+            id: heartbeatId,
+            streamId: activeStreamId,
+            userId: currentUser?.uid || 'anonymous',
+            username: currentUser?.username || 'viewer',
+            profilePhoto: currentUser?.profilePhoto || '',
+            lastActive: Date.now()
+          }).catch(() => {});
+        };
+
+        writeHeartbeat();
+        const heartbeatInterval = setInterval(writeHeartbeat, 10000);
+
+        return () => {
+          unsubscribe();
+          clearInterval(heartbeatInterval);
+          deleteDoc(heartbeatRef).catch(() => {});
+        };
+      }
+    } else {
+      if (isViewer) {
+        setBroadcaster({
+          uid: 'clara-uid',
+          fullName: 'Clara Hughes',
+          username: 'clara_h',
+          profilePhoto: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&h=150&q=80'
+        });
+      }
+    }
+  }, [isLive, showEndSummary, isViewer]);
+
+  // Real-time Viewers Listener (Broadcaster only listens and sums viewers)
+  useEffect(() => {
+    if (!isLive || showEndSummary || isViewer || !currentUser) return;
+
+    if (!isFirebaseMock) {
+      const viewersQuery = query(
+        collection(db, 'liveViewers'),
+        where('streamId', '==', activeStreamId)
+      );
+
+      const unsubscribe = onSnapshot(viewersQuery, (snapshot) => {
+        const count = snapshot.size;
+        setViewerCount(count > 0 ? count : 1);
+        
+        // Write count back to stream doc so viewers read it
+        const streamRef = doc(db, 'liveStreams', activeStreamId);
+        updateDoc(streamRef, {
+          viewerCount: count > 0 ? count : 1
+        }).catch(() => {});
+      }, (error) => {
+        console.error("Error fetching live viewers:", error);
+      });
+
+      return () => unsubscribe();
+    }
+  }, [isLive, showEndSummary, isViewer, currentUser, activeStreamId]);
+
+  // Real-time Comments Listener (Firestore synced)
+  useEffect(() => {
+    if (!isLive || showEndSummary || !currentUser) return;
+
+    if (!isFirebaseMock) {
+      const commentsQuery = query(
+        collection(db, 'liveComments'),
+        where('streamId', '==', activeStreamId)
+      );
+
+      const unsubscribe = onSnapshot(commentsQuery, (snapshot) => {
+        setLiveComments(prevComments => {
+          const fetched: any[] = [];
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            const commentId = doc.id;
+            
+            // Check if this comment is already in state to preserve its unique local arrival timestamp
+            const existingComment = prevComments.find(c => c.id === commentId);
+            const arrivalTime = existingComment ? existingComment.timestamp : Date.now();
+
+            fetched.push({
+              id: commentId,
+              username: data.username || 'student',
+              avatar: data.profilePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80',
+              text: data.message || data.text || '',
+              isMe: data.userId === currentUser?.uid,
+              createdAt: data.createdAt,
+              timestamp: arrivalTime
+            });
+          });
+
+          // Sort in chronological order
+          fetched.sort((a, b) => {
+            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return timeA - timeB;
+          });
+
+          return fetched;
+        });
+      }, (error) => {
+        console.error("Error subscribing to live comments:", error);
+      });
+
+      return () => unsubscribe();
+    }
+  }, [isLive, showEndSummary, currentUser, activeStreamId]);
+
+  // Real-time Likes Listener (Firestore synced)
+  useEffect(() => {
+    if (!isLive || showEndSummary || !currentUser) return;
+
+    if (!isFirebaseMock) {
+      const likesQuery = query(
+        collection(db, 'liveLikes'),
+        where('streamId', '==', activeStreamId)
+      );
+
+      let isFirstLoad = true;
+      const unsubscribe = onSnapshot(likesQuery, (snapshot) => {
+        setTotalLikes(snapshot.size);
+
+        if (isFirstLoad) {
+          isFirstLoad = false;
+          return;
+        }
+
+        // Only trigger animations for newly appended likes after loading history
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            triggerHeartAnimation();
+          }
+        });
+      }, (error) => {
+        console.error("Error reading live likes snapshot:", error);
+      });
+
+      return () => unsubscribe();
+    }
+  }, [isLive, showEndSummary, currentUser, activeStreamId]);
+
+  // 6. Dynamic comment fade-out timer (Filters active comments based on 8-second threshold)
+  useEffect(() => {
+    if (!isLive) return;
+    
+    const updateActiveComments = () => {
+      const now = Date.now();
+      setActiveComments(liveComments.filter(comment => {
+        const age = now - (comment.timestamp || now);
+        return age < 8000; // Only visible if less than 8 seconds old
+      }));
+    };
+
+    updateActiveComments();
+    const timer = setInterval(updateActiveComments, 1000);
+    return () => clearInterval(timer);
+  }, [liveComments, isLive]);
+
+  // Auto scroll to bottom when active comments update
   useEffect(() => {
     commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [liveComments]);
+  }, [activeComments]);
 
-  // Add a visual floating heart bubble animation
-  const handleLikeClick = () => {
-    setTotalLikes(prev => prev + 1);
-    const newHeart = {
-      id: Date.now() + Math.random(),
-      x: Math.random() * 60 + 20, // offset left %
+  // 7. Broadcaster Starts the Stream (Go Live action)
+  const handleGoLive = async () => {
+    setIsCounting(true);
+    let countVal = 3;
+    setCountdown(3);
+
+    const interval = setInterval(() => {
+      countVal -= 1;
+      if (countVal > 0) {
+        setCountdown(countVal);
+      } else if (countVal === 0) {
+        setCountdown('GO!');
+      } else {
+        clearInterval(interval);
+        setIsCounting(false);
+        setIsLive(true); // Transitions the broadcaster to live!
+
+        // Send a notification activity if synced with Firestore
+        if (!isFirebaseMock && currentUser) {
+          const activityId = 'activity-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+          setDoc(doc(db, 'userActivities', activityId), {
+            id: activityId,
+            userId: currentUser.uid,
+            fullName: currentUser.fullName,
+            username: currentUser.username,
+            profilePhoto: currentUser.profilePhoto || '',
+            activityType: 'create_reel',
+            activityDetails: `started a real-time live video broadcast! 🎥📡`,
+            targetId: activeStreamId,
+            createdAt: new Date().toISOString()
+          }).catch(() => {});
+        }
+      }
+    }, 1000);
+  };
+
+  // 8. Hearts animation trigger helper
+  const triggerHeartAnimation = () => {
+    const emojis = ['❤️', '💖', '💝', '💕', '💛', '💙', '💜', '🧡', '✨'];
+    const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+    const newHeart: HeartItem = {
+      id: 'heart-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+      emoji: randomEmoji,
+      x: Math.random() * 40 - 20, // offset range
+      scale: Math.random() * 0.4 + 0.8 // size range
     };
     setFloatingHearts(prev => [...prev, newHeart]);
     setTimeout(() => {
       setFloatingHearts(prev => prev.filter(h => h.id !== newHeart.id));
-    }, 2000);
+    }, 2200);
   };
 
-  const handlePostComment = (e: React.FormEvent) => {
+  // Like click trigger
+  const handleLikeClick = async () => {
+    triggerHeartAnimation();
+
+    if (!isFirebaseMock) {
+      try {
+        const likeId = 'like-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+        await setDoc(doc(db, 'liveLikes', likeId), {
+          id: likeId,
+          streamId: activeStreamId,
+          userId: currentUser?.uid || 'anonymous',
+          createdAt: new Date().toISOString()
+        });
+        
+        updateDoc(doc(db, 'liveStreams', activeStreamId), {
+          likesCount: increment(1)
+        }).catch(() => {});
+      } catch (err) {
+        console.error("Failed to post live like:", err);
+      }
+    } else {
+      setTotalLikes(prev => prev + 1);
+    }
+  };
+
+  // Submit chat comment
+  const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCommentText.trim()) return;
 
-    setLiveComments(prev => [
-      ...prev,
-      {
-        id: String(Date.now()),
+    const textValue = newCommentText.trim();
+    setNewCommentText('');
+    setShowEmojiPicker(false);
+
+    if (!isFirebaseMock) {
+      try {
+        const commentId = 'comment-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+        await setDoc(doc(db, 'liveComments', commentId), {
+          commentId,
+          streamId: activeStreamId,
+          userId: currentUser?.uid || 'anonymous',
+          username: currentUser?.username || 'student',
+          profilePhoto: currentUser?.profilePhoto || '',
+          message: textValue,
+          text: textValue,
+          timestamp: Date.now(),
+          createdAt: new Date().toISOString()
+        });
+      } catch (err) {
+        console.error("Failed to post live comment:", err);
+      }
+    } else {
+      const myComment = {
+        id: 'mock-cmt-' + Date.now(),
         username: currentUser?.username || 'me_student',
         avatar: currentUser?.profilePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80',
-        text: newCommentText.trim(),
-        isMe: true
-      }
-    ]);
-    setNewCommentText('');
+        text: textValue,
+        isMe: true,
+        timestamp: Date.now()
+      };
+      setLiveComments(prev => [...prev, myComment]);
+    }
   };
 
-  // Format counter to MM:SS
+  // Share stream
+  const handleShareClick = () => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(() => {
+      alert("Live stream link copied to clipboard! Share with your class. 📤✅");
+    }).catch(() => {
+      alert("Failed to copy link. Share this stream manually! 🔗");
+    });
+  };
+
+  // Simulates purchasing / sending gifts
+  const handleSendGift = (giftName: string, icon: string) => {
+    setShowGiftsPanel(false);
+    alert(`You sent a ${giftName} ${icon}! 🎁✨`);
+
+    const giftMessage = `sent a ${giftName} ${icon}! 🎁`;
+    if (!isFirebaseMock) {
+      const commentId = 'comment-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+      setDoc(doc(db, 'liveComments', commentId), {
+        commentId,
+        streamId: activeStreamId,
+        userId: currentUser?.uid || 'anonymous',
+        username: currentUser?.username || 'student',
+        profilePhoto: currentUser?.profilePhoto || '',
+        message: giftMessage,
+        text: giftMessage,
+        timestamp: Date.now(),
+        createdAt: new Date().toISOString()
+      }).catch(() => {});
+    } else {
+      const giftComment = {
+        id: 'mock-cmt-gift-' + Date.now(),
+        username: currentUser?.username || 'me_student',
+        avatar: currentUser?.profilePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80',
+        text: giftMessage,
+        isMe: true,
+        timestamp: Date.now()
+      };
+      setLiveComments(prev => [...prev, giftComment]);
+    }
+  };
+
+  // Format counter (MM:SS)
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -888,225 +1379,509 @@ function LiveStreamOverlay({ onClose, currentUser }: LiveStreamOverlayProps) {
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col justify-between overflow-hidden font-sans select-none text-white">
       
-      {/* 1. 3-2-1 INITIAL COUNTDOWN OVERLAY */}
-      {isCounting && (
-        <div className="absolute inset-0 bg-slate-950 z-55 flex flex-col items-center justify-center text-center p-6">
-          <div className="absolute top-8 left-0 right-0 flex items-center justify-center gap-2">
-            <span className="p-1 px-3 rounded-full bg-pink-500/10 text-pink-400 border border-pink-500/30 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 animate-pulse">
-              <span className="h-2 w-2 rounded-full bg-pink-500" />
-              Initializing Broadcast
-            </span>
-          </div>
-          
-          <div className="relative">
-            {/* Visual background rotating glow */}
-            <div className="absolute -inset-10 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 opacity-20 blur-2xl animate-spin-slow duration-10000" />
-            <motion.div 
-              key={countdown}
-              initial={{ scale: 0.3, opacity: 0 }}
-              animate={{ scale: [1, 1.2, 1], opacity: 1 }}
-              transition={{ duration: 0.8 }}
-              className="text-8xl font-black tracking-tighter bg-gradient-to-r from-pink-400 via-rose-500 to-amber-400 bg-clip-text text-transparent filter drop-shadow"
-            >
-              {countdown}
-            </motion.div>
-          </div>
-
-          <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-12 animate-none">
-            Turn on your campus spotlight • Connect live
-          </p>
-        </div>
-      )}
-
-      {/* 2. LIVE CAMERA BROADCAST CANVAS OR SIMULATED FALLBACK */}
-      <div className="absolute inset-0 w-full h-full z-10 bg-neutral-900">
-        {cameraError ? (
-          // Sandbox safe premium loop fallback if camera blocked
-          <div className="relative w-full h-full">
-            <video 
-              src="https://assets.mixkit.co/videos/preview/mixkit-group-of-friends-having-fun-at-a-music-festival-vertical-39745-large.mp4"
-              className="w-full h-full object-cover"
-              autoPlay
-              loop
-              muted
-              playsInline
-            />
-            <div className="absolute top-20 right-4 z-20 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full text-[9px] font-bold text-cyan-400 tracking-wider uppercase border border-cyan-400/30 flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-cyan-400" />
-              <span>Studio Sandbox Fallback Stream</span>
-            </div>
-          </div>
-        ) : (
-          // Real live user video element
+      {/* 1. IMMERSIVE FULL-SCREEN CAMERA OR SIMULATED FALLBACK */}
+      <div className="absolute inset-0 w-full h-full z-10 bg-stone-950 overflow-hidden select-none">
+        {streamMode === 'camera' && !cameraError && !isViewer ? (
           <video 
             ref={videoRef}
-            className="w-full h-full object-cover transform scale-x-[-1]"
+            className={`w-full h-full object-cover transition-all duration-700 ${isFrontCamera ? 'transform scale-x-[-1]' : ''} ${isFilterActive ? 'brightness-110 saturate-125 sepia-[10%] contrast-[102%] hue-rotate-15 filter blur-[0.3px]' : ''}`}
             autoPlay
             playsInline
             muted
           />
+        ) : (
+          <div className="relative w-full h-full">
+            <video 
+              key={vlogLoops[currentVlogIndex]}
+              src={vlogLoops[currentVlogIndex]}
+              className={`w-full h-full object-cover transition-all duration-700 ${isFilterActive ? 'brightness-110 saturate-125 sepia-[10%] contrast-[102%] hue-rotate-15 filter blur-[0.3px]' : ''}`}
+              autoPlay
+              loop
+              muted
+              playsInline
+              onError={() => {
+                console.warn("Vlog video failed to play, cycling index");
+                setCurrentVlogIndex((prev) => (prev + 1) % vlogLoops.length);
+              }}
+            />
+            {isViewer && (
+              <div className="absolute top-20 left-4 z-20 bg-pink-500/80 backdrop-blur-md px-2.5 py-1 rounded-full text-[9px] font-black text-white tracking-widest uppercase border border-pink-400/30 flex items-center gap-1 shadow-lg shadow-pink-500/20">
+                <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping" />
+                <span>LOCATION: {currentVlogIndex === 0 ? 'STUDENT QUAD' : currentVlogIndex === 1 ? 'CAMPUS CAFE' : currentVlogIndex === 2 ? 'CREATIVE LAB' : 'SPORTS COMPLEX'}</span>
+              </div>
+            )}
+          </div>
         )}
 
-        {/* Cinematic subtle dark overlay to keep HUD/Chat highly legible */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80 pointer-events-none" />
+        {/* Dynamic visual flashlight/glowing overlay */}
+        {isFlashOn && (
+          <div className="absolute inset-0 bg-white/10 pointer-events-none mix-blend-screen z-15 shadow-[inset_0_0_120px_rgba(255,255,255,0.2)]" />
+        )}
+
+        {/* Professional gradient overlays to ensure full-screen legibility of all floating items */}
+        <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/85 via-black/40 to-transparent pointer-events-none z-12" />
+        <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none z-12" />
       </div>
 
-      {/* 3. TOP LIVE STATUS HUD BAR */}
-      <div className="relative z-30 p-4 pt-6 flex items-center justify-between pointer-events-auto">
-        <div className="flex items-center gap-2">
-          {/* Pulsing Live indicator */}
-          <span className="p-1 px-3 rounded-full bg-red-600 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-lg shadow-red-600/30">
-            <span className="h-2 w-2 rounded-full bg-white animate-ping" />
-            LIVE
-          </span>
-
-          {/* Time Counter */}
-          <span className="text-xs font-mono font-black bg-black/40 backdrop-blur-md p-1 px-2.5 rounded-lg border border-white/10">
-            {formatTime(duration)}
-          </span>
-        </div>
-
-        {/* Viewers Counter with visual badge */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-md p-1 px-2.5 rounded-lg border border-white/10 text-xs font-bold">
-            <Users className="w-3.5 h-3.5 text-pink-400" />
-            <span>{viewerCount.toLocaleString()}</span>
+      {/* 2. BROADCASTER PRE-LIVE SETUP OVERLAY */}
+      {!isLive && !isViewer && (
+        <div className="absolute inset-0 bg-black/55 backdrop-blur-md z-45 flex flex-col justify-between p-6 pt-16">
+          {/* Header instructions */}
+          <div className="w-full text-center mt-4">
+            <span className="p-1.5 px-3 rounded-full bg-pink-500/25 text-pink-300 border border-pink-500/30 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 w-fit mx-auto animate-pulse">
+              <span className="h-2 w-2 rounded-full bg-pink-500 animate-ping" />
+              Pre-Live Broadcast Studio
+            </span>
+            <h2 className="text-2xl font-black tracking-tight text-white mt-3 drop-shadow-md">Choose Your Style & Connect</h2>
+            <p className="text-xs text-stone-300 max-w-xs mx-auto mt-1 leading-relaxed">
+              Verify your appearance, select campus locations, or turn on filters before interacting with peers live!
+            </p>
           </div>
 
+          {/* Quick config options inside card */}
+          <div className="w-full max-w-sm mx-auto bg-black/60 border border-white/10 backdrop-blur-xl p-5 rounded-2xl flex flex-col gap-4">
+            {/* Mode selection (Camera or Simulation) */}
+            <div>
+              <label className="text-[10px] text-pink-400 font-black uppercase tracking-wider block mb-2">Streaming Input Mode</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setStreamMode('camera')}
+                  className={`py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1.5 cursor-pointer ${
+                    streamMode === 'camera' 
+                      ? 'bg-pink-600 border-pink-500 text-white font-extrabold shadow-md shadow-pink-600/20' 
+                      : 'bg-white/5 border-white/10 text-stone-300 hover:bg-white/10'
+                  }`}
+                >
+                  <Video className="w-3.5 h-3.5" />
+                  Live Webcam
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStreamMode('vlog')}
+                  className={`py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1.5 cursor-pointer ${
+                    streamMode === 'vlog' 
+                      ? 'bg-pink-600 border-pink-500 text-white font-extrabold shadow-md shadow-pink-600/20' 
+                      : 'bg-white/5 border-white/10 text-stone-300 hover:bg-white/10'
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Campus Simulation
+                </button>
+              </div>
+            </div>
+
+            {/* Quick adjust row */}
+            <div className="grid grid-cols-3 gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsFilterActive(!isFilterActive)}
+                className={`py-2.5 rounded-xl text-[10px] font-bold border transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                  isFilterActive ? 'bg-pink-500/20 border-pink-500 text-pink-400' : 'bg-white/5 border-white/10 text-stone-300'
+                }`}
+              >
+                <Smile className="w-4 h-4 mb-0.5" />
+                Beauty Filter
+              </button>
+              <button
+                type="button"
+                onClick={() => setLiveAudioMuted(!liveAudioMuted)}
+                className={`py-2.5 rounded-xl text-[10px] font-bold border transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                  liveAudioMuted ? 'bg-rose-500/20 border-rose-500 text-rose-400' : 'bg-white/5 border-white/10 text-stone-300'
+                }`}
+              >
+                {liveAudioMuted ? <MicOff className="w-4 h-4 mb-0.5" /> : <Mic className="w-4 h-4 mb-0.5" />}
+                {liveAudioMuted ? 'Muted' : 'Audio On'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (streamMode === 'vlog') {
+                    setCurrentVlogIndex((prev) => (prev + 1) % vlogLoops.length);
+                  } else {
+                    setIsFrontCamera(!isFrontCamera);
+                  }
+                }}
+                className="py-2.5 rounded-xl text-[10px] font-bold border bg-white/5 border-white/10 text-stone-300 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4 mb-0.5" />
+                Flip Stream
+              </button>
+            </div>
+          </div>
+
+          {/* Large Start Button */}
+          <div className="w-full max-w-sm mx-auto mb-6">
+            <button
+              type="button"
+              onClick={handleGoLive}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-extrabold text-sm uppercase tracking-widest shadow-xl shadow-pink-600/30 cursor-pointer hover:shadow-pink-600/40 transform hover:-translate-y-0.5 transition-all active:scale-95 flex items-center justify-center gap-2"
+            >
+              <Radio className="w-4 h-4 animate-pulse" />
+              Go Live Now
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full mt-2.5 py-2 rounded-xl text-stone-400 hover:text-white hover:bg-white/5 font-extrabold text-[10px] uppercase tracking-wider transition-all cursor-pointer"
+            >
+              Cancel & Exit
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 3. 3-2-1 INITIAL COUNTDOWN OVERLAY */}
+      {isCounting && (
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-55 flex flex-col items-center justify-center text-center p-6 select-none">
+          <div className="relative">
+            <div className="absolute -inset-14 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 opacity-20 blur-2xl animate-pulse" />
+            <motion.div 
+              key={countdown}
+              initial={{ scale: 0.2, opacity: 0 }}
+              animate={{ scale: [1, 1.4, 1], opacity: 1 }}
+              transition={{ duration: 0.8 }}
+              className="text-7xl font-sans font-black bg-clip-text text-transparent bg-gradient-to-r from-pink-400 via-rose-400 to-amber-300 drop-shadow-[0_4px_12px_rgba(236,72,153,0.3)] tracking-wider"
+            >
+              {countdown}
+            </motion.div>
+            <p className="text-xs text-pink-300 font-extrabold uppercase tracking-widest mt-6 animate-pulse">
+              Preparing live broadcast feed...
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 4. TIKTOK LIVE HUD: TOP BAR (PINS PROFILE & VIEW COUNT) */}
+      <div className="relative z-30 p-3 pt-5 flex items-center justify-between pointer-events-auto">
+        {/* Left corner: Immersive Creator Profile Badge */}
+        <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-md p-1 pl-1 pr-3 rounded-full border border-white/10 max-w-[200px] select-none">
+          <img 
+            src={isViewer ? (broadcaster?.profilePhoto || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&h=150&q=80') : (currentUser?.profilePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80')} 
+            alt="Broadcaster" 
+            className="w-8 h-8 rounded-full border border-pink-500 object-cover"
+          />
+          <div className="flex flex-col min-w-0">
+            <span className="text-[10px] font-black tracking-tight truncate leading-none mb-0.5">
+              @{isViewer ? (broadcaster?.username || 'broadcaster') : (currentUser?.username || 'me_student')}
+            </span>
+            <div className="flex items-center gap-1 text-[8px] text-stone-300 font-bold leading-none">
+              <Users className="w-2.5 h-2.5 text-stone-300" />
+              <span>{viewerCount.toLocaleString()}</span>
+            </div>
+          </div>
+          {isViewer && (
+            <button
+              type="button"
+              onClick={() => alert("You followed this live broadcaster! 🔔")}
+              className="ml-2 px-2.5 py-1 bg-pink-600 hover:bg-pink-700 active:scale-95 transition-all text-white font-extrabold text-[8px] uppercase tracking-wider rounded-full cursor-pointer flex items-center justify-center"
+            >
+              Follow
+            </button>
+          )}
+        </div>
+
+        {/* Right corner: Live Indicators, Connection Ping & Close Button */}
+        <div className="flex items-center gap-2.5 select-none">
+          {/* Pulsing Orange "LIVE" badge & duration timer */}
+          <div className="flex items-center bg-red-600 text-white rounded-lg p-0.5 pr-2.5 text-[10px] font-black uppercase tracking-wider border border-red-500/25">
+            <span className="bg-white text-red-600 px-1.5 py-0.5 rounded-md font-black mr-1.5">
+              LIVE
+            </span>
+            <span className="font-mono text-[9px] font-bold">
+              {formatTime(duration)}
+            </span>
+          </div>
+
+          {/* Connection signal (Network) */}
+          <div className="flex items-center gap-1 bg-black/40 backdrop-blur-md py-1 px-2 rounded-lg border border-white/5" title="Stable connection ping">
+            <Wifi className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+            <span className="text-[8px] font-black text-emerald-400 uppercase font-mono">18ms</span>
+          </div>
+
+          {/* TIKTOK LIVE Exit Button */}
           <button 
-            onClick={handleEndBroadcast}
-            className="p-1 px-3 rounded-full bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-[10px] font-black uppercase tracking-wider shadow cursor-pointer transition-all border border-rose-500"
+            type="button"
+            onClick={isViewer ? onClose : handleEndBroadcast}
+            className="p-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-stone-200 hover:bg-white/10 cursor-pointer active:scale-90 transition-all flex items-center justify-center"
+            title="Exit Livestream"
           >
-            End Live
+            <X className="w-4.5 h-4.5" />
           </button>
         </div>
       </div>
 
-      {/* 4. CURRENT BROADCASTER FLOATING CHIP */}
-      <div className="relative z-30 px-4 pointer-events-none flex items-center gap-2 bg-gradient-to-r from-black/30 to-transparent p-2 rounded-xl w-fit">
-        <img 
-          src={currentUser?.profilePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80'} 
-          alt="Avatar" 
-          className="w-8 h-8 rounded-full border-2 border-pink-500 object-cover"
-        />
-        <div>
-          <div className="flex items-center gap-1 text-[11px] font-black">
-            <span>@{currentUser?.username || 'me_student'}</span>
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          </div>
-          <p className="text-[9px] text-slate-300 font-bold uppercase tracking-tight">Broadcaster</p>
-        </div>
+      {/* 5. TIKTOK LIVE FLOATING CONTROLS PANEL (RIGHT COLUMN FLUID OVERLAY) */}
+      <div className="absolute right-4 top-1/3 -translate-y-4 z-35 flex flex-col gap-3 pointer-events-auto select-none">
+        {/* Like trigger heart button (Vertical Rail) */}
+        <button
+          type="button"
+          onClick={handleLikeClick}
+          className="w-11 h-11 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-stone-100 hover:bg-black/60 hover:text-red-400 transition-all active:scale-90 cursor-pointer flex flex-col items-center justify-center relative shadow-lg"
+          title="Send Love Heart"
+        >
+          <Heart className="w-5 h-5 fill-red-500 stroke-red-400" />
+          <span className="absolute -bottom-1 px-1 bg-red-600 text-[8px] font-black rounded-full border border-red-500/20">{totalLikes}</span>
+        </button>
+
+        {/* Gift Trigger Button */}
+        <button
+          type="button"
+          onClick={() => setShowGiftsPanel(!showGiftsPanel)}
+          className={`w-11 h-11 rounded-full backdrop-blur-md border transition-all active:scale-90 cursor-pointer flex items-center justify-center shadow-lg ${
+            showGiftsPanel 
+              ? 'bg-pink-600 border-pink-400 text-white shadow-pink-500/30' 
+              : 'bg-black/40 border-white/10 text-stone-100 hover:bg-black/60'
+          }`}
+          title="Send Virtual Gifts"
+        >
+          <Gift className="w-5 h-5 text-amber-300 animate-bounce" />
+        </button>
+
+        {/* Share stream button */}
+        <button
+          type="button"
+          onClick={handleShareClick}
+          className="w-11 h-11 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-stone-100 hover:bg-black/60 active:scale-90 transition-all cursor-pointer flex items-center justify-center shadow-lg"
+          title="Share Stream Link"
+        >
+          <Share2 className="w-5 h-5" />
+        </button>
+
+        {/* Settings controls (Broadcaster Settings Vertical Stack) */}
+        {!isViewer && isLive && (
+          <>
+            {/* Filter Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsFilterActive(!isFilterActive)}
+              className={`w-11 h-11 rounded-full backdrop-blur-md border transition-all active:scale-90 cursor-pointer flex items-center justify-center shadow-lg ${
+                isFilterActive 
+                  ? 'bg-pink-500/20 border-pink-500 text-pink-400 shadow-[0_0_10px_rgba(236,72,153,0.25)]' 
+                  : 'bg-black/40 border-white/10 text-stone-100 hover:bg-black/60'
+              }`}
+              title="Beauty Filter"
+            >
+              <Smile className="w-5 h-5" />
+            </button>
+
+            {/* Mic Toggle */}
+            <button
+              type="button"
+              onClick={() => setLiveAudioMuted(!liveAudioMuted)}
+              className={`w-11 h-11 rounded-full backdrop-blur-md border transition-all active:scale-90 cursor-pointer flex items-center justify-center shadow-lg ${
+                liveAudioMuted 
+                  ? 'bg-rose-500/25 border-rose-500 text-rose-400' 
+                  : 'bg-black/40 border-white/10 text-stone-100 hover:bg-black/60'
+              }`}
+              title={liveAudioMuted ? "Unmute Mic" : "Mute Mic"}
+            >
+              {liveAudioMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            </button>
+
+            {/* Camera Switch / Flip */}
+            <button
+              type="button"
+              onClick={() => {
+                if (streamMode === 'vlog') {
+                  setCurrentVlogIndex((prev) => (prev + 1) % vlogLoops.length);
+                } else {
+                  setIsFrontCamera(!isFrontCamera);
+                }
+              }}
+              className="w-11 h-11 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-stone-100 hover:bg-black/60 transition-all active:scale-90 cursor-pointer flex items-center justify-center shadow-lg"
+              title={streamMode === 'vlog' ? "Cycle Location Feed" : "Flip Camera"}
+            >
+              <RefreshCw className="w-4.5 h-4.5" />
+            </button>
+
+            {/* Flash Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsFlashOn(!isFlashOn)}
+              className={`w-11 h-11 rounded-full backdrop-blur-md border transition-all active:scale-90 cursor-pointer flex items-center justify-center shadow-lg ${
+                isFlashOn 
+                  ? 'bg-amber-500/20 border-amber-400 text-amber-300' 
+                  : 'bg-black/40 border-white/10 text-stone-100 hover:bg-black/60'
+              }`}
+              title="Flash Toggle"
+            >
+              <Zap className="w-5 h-5" />
+            </button>
+          </>
+        )}
       </div>
 
-      {/* 5. FLOATING HEART ANIME BUBBLE STACK */}
-      <div className="absolute right-4 bottom-28 pointer-events-none h-60 w-24 overflow-hidden z-35">
+      {/* 6. VIRTUAL GIFT SHOP PANEL POP-UP OVERLAY */}
+      {showGiftsPanel && (
+        <div className="absolute left-4 right-4 bottom-28 bg-black/85 backdrop-blur-xl border border-white/10 p-4 rounded-3xl z-40 animate-fade-in pointer-events-auto select-none">
+          <div className="flex items-center justify-between mb-3.5">
+            <span className="text-[10px] text-pink-400 font-black uppercase tracking-wider">Campus Live Gift Store 🎁✨</span>
+            <button 
+              type="button" 
+              onClick={() => setShowGiftsPanel(false)}
+              className="text-stone-400 hover:text-white text-xs font-black cursor-pointer px-1"
+            >
+              Close
+            </button>
+          </div>
+          <div className="grid grid-cols-4 gap-2.5">
+            <button 
+              type="button" 
+              onClick={() => handleSendGift("Campus Cap", "🎓")}
+              className="bg-white/5 hover:bg-pink-600/10 border border-white/5 hover:border-pink-500/30 p-2.5 rounded-2xl flex flex-col items-center gap-1 cursor-pointer transition-all active:scale-95"
+            >
+              <span className="text-2xl mb-1">🎓</span>
+              <span className="text-[8px] font-black uppercase tracking-wider text-stone-200">Campus Cap</span>
+            </button>
+            <button 
+              type="button" 
+              onClick={() => handleSendGift("Coffee Shot", "☕")}
+              className="bg-white/5 hover:bg-pink-600/10 border border-white/5 hover:border-pink-500/30 p-2.5 rounded-2xl flex flex-col items-center gap-1 cursor-pointer transition-all active:scale-95"
+            >
+              <span className="text-2xl mb-1">☕</span>
+              <span className="text-[8px] font-black uppercase tracking-wider text-stone-200">Study Fuel</span>
+            </button>
+            <button 
+              type="button" 
+              onClick={() => handleSendGift("University Hat", "🎩")}
+              className="bg-white/5 hover:bg-pink-600/10 border border-white/5 hover:border-pink-500/30 p-2.5 rounded-2xl flex flex-col items-center gap-1 cursor-pointer transition-all active:scale-95"
+            >
+              <span className="text-2xl mb-1">🎩</span>
+              <span className="text-[8px] font-black uppercase tracking-wider text-stone-200">Grad Hat</span>
+            </button>
+            <button 
+              type="button" 
+              onClick={() => handleSendGift("Love Rose", "🌹")}
+              className="bg-white/5 hover:bg-pink-600/10 border border-white/5 hover:border-pink-500/30 p-2.5 rounded-2xl flex flex-col items-center gap-1 cursor-pointer transition-all active:scale-95"
+            >
+              <span className="text-2xl mb-1">🌹</span>
+              <span className="text-[8px] font-black uppercase tracking-wider text-stone-200">Love Rose</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 7. FLOATING HEART ANIME BUBBLE STACK */}
+      <div className="absolute right-4 bottom-24 pointer-events-none h-64 w-28 overflow-hidden z-35 select-none">
         <AnimatePresence>
           {floatingHearts.map(heart => (
             <motion.div
               key={heart.id}
-              initial={{ y: 200, x: `${heart.x}%`, opacity: 0, scale: 0.7 }}
+              initial={{ y: 220, x: `${heart.x}%`, opacity: 0, scale: 0.6 }}
               animate={{ 
                 y: 0, 
-                x: `${heart.x + (Math.sin(heart.id) * 15)}%`, 
+                x: `${heart.x + (Math.sin(parseInt(heart.id.substring(5, 10)) || 1) * 20)}%`, 
                 opacity: [0, 1, 1, 0],
-                scale: [0.7, 1.2, 1, 0.6]
+                scale: [0.6, heart.scale * 1.2, heart.scale, 0.5]
               }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 1.8, ease: "easeOut" }}
-              className="absolute bottom-0 text-red-500 text-3xl select-none"
+              transition={{ duration: 2.0, ease: "easeOut" }}
+              className="absolute bottom-0 text-3xl select-none filter drop-shadow-md"
             >
-              ❤️
+              {heart.emoji}
             </motion.div>
           ))}
         </AnimatePresence>
       </div>
 
-      {/* 6. BOTTOM CHAT MESSAGES & TEXT INPUT BAR */}
-      <div className="relative z-30 p-4 bg-gradient-to-t from-black/95 via-black/40 to-transparent flex flex-col gap-3">
-        {/* Chat List Screen Container */}
-        <div className="max-h-48 overflow-y-auto flex flex-col gap-1.5 pr-2 custom-scrollbar pointer-events-auto">
-          {liveComments.map((comment) => (
-            <div 
-              key={comment.id}
-              className={`p-1.5 px-3 rounded-2xl w-fit max-w-[90%] text-xs flex items-start gap-2 backdrop-blur-sm shadow-sm ${
-                comment.isMe 
-                  ? 'bg-pink-600/35 border border-pink-500/20 text-pink-50' 
-                  : 'bg-black/45 border border-white/5 text-slate-100'
-              }`}
-            >
-              <img 
-                src={comment.avatar} 
-                alt="avatar" 
-                className="w-4 h-4 rounded-full object-cover mt-0.5 border border-white/20"
-              />
-              <div className="flex flex-col">
-                <span className={`text-[10px] font-black leading-none mb-0.5 ${comment.isMe ? 'text-pink-300' : 'text-slate-300'}`}>
-                  @{comment.username}
-                </span>
-                <span className="font-medium leading-relaxed">{comment.text}</span>
-              </div>
+      {/* 8. BOTTOM-LEFT FLOATING CHAT BUBBLE STACK */}
+      <div className="relative z-30 p-4 pb-2 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col gap-2 cursor-default select-none max-w-sm pointer-events-auto">
+        {/* Dynamic Bubble Stack wrapper (auto scrolling, auto fading) */}
+        <div className="max-h-48 overflow-y-auto flex flex-col gap-2 pr-2 scrollbar-none scroll-smooth">
+          {activeComments.length === 0 ? (
+            <div className="p-2 py-3 text-left text-[10px] text-pink-300 font-extrabold tracking-widest uppercase animate-pulse">
+              💬 Waiting for community chatter...
             </div>
-          ))}
+          ) : (
+            activeComments.map((comment) => (
+              <motion.div 
+                key={comment.id}
+                initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.3 }}
+                className={`p-2.5 px-3.5 rounded-2xl w-fit max-w-[95%] text-xs flex items-start gap-2.5 shadow-md border ${
+                  comment.isMe 
+                    ? 'bg-pink-600/35 border-pink-500/20 text-pink-50 rounded-bl-xs' 
+                    : comment.text.includes("sent a") 
+                      ? 'bg-amber-500/20 border-amber-400/30 text-amber-100 font-extrabold rounded-bl-xs shadow-[0_0_10px_rgba(245,158,11,0.15)]'
+                      : 'bg-black/50 border-white/5 text-stone-100 rounded-bl-xs'
+                }`}
+              >
+                <img 
+                  src={comment.avatar} 
+                  alt="avatar" 
+                  className="w-5.5 h-5.5 rounded-full object-cover border border-white/10 mt-0.5"
+                />
+                <div className="flex flex-col">
+                  <span className={`text-[9px] font-black leading-none mb-1 ${comment.isMe ? 'text-pink-300' : comment.text.includes("sent a") ? 'text-amber-300' : 'text-slate-300'}`}>
+                    @{comment.username}
+                  </span>
+                  <span className="font-semibold leading-relaxed text-left break-all">{comment.text}</span>
+                </div>
+              </motion.div>
+            ))
+          )}
           <div ref={commentsEndRef} />
         </div>
 
-        {/* Controls Layout (Typing Input + Camera Action Controls + Heart Clicker) */}
-        <div className="flex items-center gap-2 mt-1 pointer-events-auto">
-          <form onSubmit={handlePostComment} className="flex-1 flex items-center gap-1.5 bg-black/40 backdrop-blur-md p-1 px-3 rounded-full border border-white/10">
-            <input 
-              type="text" 
-              placeholder="Post a comment as Broadcaster..."
-              value={newCommentText}
-              onChange={(e) => setNewCommentText(e.target.value)}
-              className="flex-1 bg-transparent text-xs py-2 px-1 outline-none font-semibold text-white placeholder:text-slate-400"
-            />
-            <button 
-              type="submit"
-              className="p-1.5 rounded-full hover:bg-white/10 text-pink-400 active:scale-95 transition-all cursor-pointer"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </form>
+        {/* 9. BOTTOM INPUT BAR (COMMENTARY & EMOJI QUICK SELECT) */}
+        {isLive && (
+          <div className="flex flex-col gap-1.5 mt-2">
+            {/* Quick emoji drawer toggle */}
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                className="p-1 px-2.5 bg-black/45 backdrop-blur-md rounded-full border border-white/10 text-[10px] font-extrabold text-stone-300 hover:text-white transition-all cursor-pointer flex items-center gap-1"
+              >
+                <span>😊</span>
+                <span>Quick Emojis</span>
+              </button>
+              {showEmojiPicker && (
+                <div className="flex items-center gap-1 bg-black/60 backdrop-blur-xl border border-white/10 p-1 rounded-full animate-fade-in">
+                  {['🔥', '👏', '💖', '👑', '😮', '🤣', '🎉', '💯'].map(emoji => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => {
+                        setNewCommentText(prev => prev + emoji);
+                        setShowEmojiPicker(false);
+                      }}
+                      className="w-6 h-6 flex items-center justify-center text-xs hover:bg-white/15 rounded-full transition-all cursor-pointer"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-          {/* Flip Camera */}
-          <button 
-            type="button"
-            onClick={() => setIsFrontCamera(!isFrontCamera)}
-            className="p-3 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-stone-200 hover:text-white hover:bg-black/60 transition-all active:scale-90 cursor-pointer"
-            title="Flip Camera"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-
-          {/* Mute Microphone toggle */}
-          <button 
-            type="button"
-            onClick={() => setLiveAudioMuted(!liveAudioMuted)}
-            className={`p-3 rounded-full backdrop-blur-md border transition-all active:scale-90 cursor-pointer ${
-              liveAudioMuted 
-                ? 'bg-rose-500/20 border-rose-500 text-rose-400' 
-                : 'bg-black/40 border-white/10 text-stone-200 hover:text-white hover:bg-black/60'
-            }`}
-            title={liveAudioMuted ? "Unmute Mic" : "Mute Mic"}
-          >
-            {liveAudioMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-          </button>
-
-          {/* Floating Heart Stream Button */}
-          <button 
-            type="button"
-            onClick={handleLikeClick}
-            className="p-3 rounded-full bg-pink-500 hover:bg-pink-600 text-white shadow-lg shadow-pink-500/20 transition-all active:scale-90 animate-pulse cursor-pointer flex items-center justify-center border border-pink-400"
-            title="Send Heart"
-          >
-            <Heart className="w-4 h-4 fill-current stroke-none" />
-          </button>
-        </div>
+            {/* Comment field formulation */}
+            <form onSubmit={handlePostComment} className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5 text-white/95 text-xs py-1.5 px-4 bg-black/50 backdrop-blur-lg rounded-2xl border border-white/10 flex-1 focus-within:border-pink-500/50 transition-all shadow-lg">
+                <MessageCircle className="w-4 h-4 text-stone-300" />
+                <input 
+                  type="text" 
+                  placeholder="Interact with class streams..."
+                  value={newCommentText}
+                  onChange={(e) => setNewCommentText(e.target.value)}
+                  className="bg-transparent border-none outline-none py-1 flex-1 text-white font-semibold placeholder:text-stone-400 text-xs"
+                />
+                {newCommentText && (
+                  <button type="submit" className="text-pink-400 hover:text-pink-300 font-extrabold text-[10px] uppercase tracking-widest pl-1 cursor-pointer">
+                    Post
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+        )}
       </div>
 
-      {/* 7. POST-BROADCAST METRICS SUMMARY MODAL */}
+      {/* 10. POST-BROADCAST METRICS SUMMARY MODAL */}
       {showEndSummary && (
-        <div className="absolute inset-0 bg-slate-950/98 z-55 flex flex-col items-center justify-center p-6 text-center">
+        <div className="absolute inset-0 bg-slate-950/98 z-55 flex flex-col items-center justify-center p-6 text-center select-none">
           <div className="relative mb-6">
             <div className="absolute -inset-8 rounded-full bg-pink-500/10 opacity-30 blur-xl animate-pulse" />
             <div className="w-16 h-16 rounded-full bg-gradient-to-r from-pink-500 to-rose-600 flex items-center justify-center text-white shadow-lg mx-auto">
@@ -1114,40 +1889,55 @@ function LiveStreamOverlay({ onClose, currentUser }: LiveStreamOverlayProps) {
             </div>
           </div>
 
-          <h3 className="text-2xl font-black text-slate-100 mb-1">Live Stream Ended</h3>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-8">Broadcast Analytics Report</p>
+          <h3 className="text-2xl font-black text-slate-100 mb-1">
+            {isViewer ? 'Broadcast Finished' : 'Live Stream Ended'}
+          </h3>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-8">
+            {isViewer ? 'Thank you for watching!' : 'Broadcast Analytics Report'}
+          </p>
 
-          {/* Bento grid style analytics display */}
-          <div className="grid grid-cols-2 gap-3 w-full max-w-sm mb-12">
-            <div className="bg-white/5 border border-white/10 p-4 rounded-2xl flex flex-col items-center justify-center">
-              <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider mb-1">Time Elapsed</span>
-              <span className="text-xl font-mono font-black text-pink-400">{formatTime(duration)}</span>
-            </div>
+          {!isViewer ? (
+            <div className="grid grid-cols-2 gap-3 w-full max-w-sm mb-12">
+              <div className="bg-white/5 border border-white/10 p-4 rounded-2xl flex flex-col items-center justify-center">
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider mb-1">Time Elapsed</span>
+                <span className="text-xl font-mono font-black text-pink-400">{formatTime(duration)}</span>
+              </div>
 
-            <div className="bg-white/5 border border-white/10 p-4 rounded-2xl flex flex-col items-center justify-center">
-              <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider mb-1">Total Viewers</span>
-              <span className="text-xl font-sans font-black text-rose-400">{(viewerCount + 34).toLocaleString()}</span>
-            </div>
+              <div className="bg-white/5 border border-white/10 p-4 rounded-2xl flex flex-col items-center justify-center">
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider mb-1">Total Viewers</span>
+                <span className="text-xl font-sans font-black text-rose-400">{viewerCount.toLocaleString()}</span>
+              </div>
 
-            <div className="bg-white/5 border border-white/10 p-4 rounded-2xl flex flex-col items-center justify-center">
-              <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider mb-1">Hearts Gained</span>
-              <span className="text-xl font-sans font-black text-amber-400">❤️ {totalLikes}</span>
-            </div>
+              <div className="bg-white/5 border border-white/10 p-4 rounded-2xl flex flex-col items-center justify-center">
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider mb-1">Hearts Gained</span>
+                <span className="text-xl font-sans font-black text-amber-400">❤️ {totalLikes}</span>
+              </div>
 
-            <div className="bg-white/5 border border-white/10 p-4 rounded-2xl flex flex-col items-center justify-center">
-              <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider mb-1">New Comments</span>
-              <span className="text-xl font-sans font-black text-emerald-400">{liveComments.length}</span>
+              <div className="bg-white/5 border border-white/10 p-4 rounded-2xl flex flex-col items-center justify-center">
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider mb-1">New Comments</span>
+                <span className="text-xl font-sans font-black text-emerald-400">{liveComments.length}</span>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-white/5 border border-white/10 p-6 rounded-2xl w-full max-w-sm mb-12 flex flex-col gap-2 items-center">
+              <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider">Stream Host</span>
+              <span className="text-lg font-black text-pink-400">@{broadcaster?.username || 'broadcaster'}</span>
+              <p className="text-xs text-slate-400 font-medium max-w-xs mt-2 text-center leading-relaxed">
+                This live broadcast session has completed. Subscribe to get notified for future streams!
+              </p>
+            </div>
+          )}
 
           <button 
+            type="button"
             onClick={onClose}
             className="w-full max-w-xs py-4 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-pink-900/30 cursor-pointer transition-all active:scale-95"
           >
-            Go Back to Shorts Feed
+            {isViewer ? 'Return to Feed' : 'Go Back to Shorts Feed'}
           </button>
         </div>
       )}
     </div>
   );
 }
+

@@ -41,8 +41,19 @@ interface FirestoreErrorInfo {
 }
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errMsg = error instanceof Error ? error.message : String(error);
+  if (typeof window !== 'undefined') {
+    if (
+      errMsg.toLowerCase().includes('quota') || 
+      errMsg.toLowerCase().includes('resource-exhausted') || 
+      errMsg.toLowerCase().includes('exhausted')
+    ) {
+      window.dispatchEvent(new CustomEvent('firestore-quota-exceeded', { detail: error }));
+    }
+  }
+
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errMsg,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -137,10 +148,14 @@ interface SocialContextProps {
   setDarkMode: React.Dispatch<React.SetStateAction<boolean>>;
   isFirebaseMock: boolean;
   enableMockBypass: () => void;
+  isQuotaExceeded: boolean;
+  setIsQuotaExceeded: React.Dispatch<React.SetStateAction<boolean>>;
   activeTab: 'home' | 'search' | 'create' | 'chat' | 'alerts' | 'profile' | 'settings' | 'shorts' | 'menu';
   setActiveTab: React.Dispatch<React.SetStateAction<'home' | 'search' | 'create' | 'chat' | 'alerts' | 'profile' | 'settings' | 'shorts' | 'menu'>>;
   targetProfileUid: string | null;
   setTargetProfileUid: React.Dispatch<React.SetStateAction<string | null>>;
+  activeLiveStreamId: string | null;
+  setActiveLiveStreamId: React.Dispatch<React.SetStateAction<string | null>>;
   reels: Reel[];
   createReel: (videoUrl: string, caption: string) => Promise<void>;
   toggleLikeReel: (reelId: string) => Promise<void>;
@@ -359,6 +374,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
   const [activeTab, setActiveTab] = useState<'home' | 'search' | 'create' | 'chat' | 'alerts' | 'profile' | 'settings' | 'shorts' | 'menu'>('home');
   const [targetProfileUid, setTargetProfileUid] = useState<string | null>(null);
+  const [activeLiveStreamId, setActiveLiveStreamId] = useState<string | null>(null);
 
   const [reels, setReels] = useState<Reel[]>(() => {
     try {
@@ -708,6 +724,70 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
+  const [isQuotaExceeded, setIsQuotaExceeded] = useState(() => {
+    try {
+      return localStorage.getItem('collegio_quota_exceeded') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      if (isQuotaExceeded) {
+        localStorage.setItem('collegio_quota_exceeded', 'true');
+      } else {
+        localStorage.removeItem('collegio_quota_exceeded');
+      }
+    } catch (e) {
+      console.warn("Failed to write collegio_quota_exceeded:", e);
+    }
+  }, [isQuotaExceeded]);
+
+  useEffect(() => {
+    const handleGlobalQuotaError = (e: Event) => {
+      console.warn("Global Firestore Quota Error event received!");
+      setIsQuotaExceeded(true);
+      if (!isFirebaseMock) {
+        console.warn("Firestore quota has been exhausted. Automatically falling back to high-fidelity local state.");
+        setIsFirebaseMock(true);
+        setAuthInitialized(true);
+        try {
+          localStorage.setItem('collegio_force_mock', 'true');
+        } catch (err) {
+          console.warn(err);
+        }
+        if (!currentUser) {
+          const target = users.find(u => u.username === 'clara_h') || users[0] || INITIAL_USERS[0];
+          setCurrentUser(target);
+          setOnboardingStep('app');
+        }
+      }
+    };
+
+    window.addEventListener('firestore-quota-exceeded', handleGlobalQuotaError);
+    return () => {
+      window.removeEventListener('firestore-quota-exceeded', handleGlobalQuotaError);
+    };
+  }, [isFirebaseMock, currentUser, users]);
+
+  // Guard against slow, unresponsive, or unreachable Firestore backend connection
+  useEffect(() => {
+    if (isFirebaseMock || authInitialized) return;
+    
+    const timeoutId = setTimeout(() => {
+      if (!authInitialized) {
+        console.warn("Firestore connection is taking too long (exceeded 5s). Automatically activating high-fidelity sandbox to prevent loading hangs.");
+        const errorEvent = new CustomEvent('firestore-quota-exceeded', { 
+          detail: new Error("Firestore connection timed out after 5 seconds") 
+        });
+        window.dispatchEvent(errorEvent);
+      }
+    }, 5000);
+
+    return () => clearTimeout(timeoutId);
+  }, [isFirebaseMock, authInitialized]);
+
   const enableMockBypass = () => {
     try {
       localStorage.setItem('collegio_force_mock', 'true');
@@ -898,7 +978,10 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       if (firebaseUser) {
         // Fetch user metadata from firestore
         try {
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          const userDocPromise = getDoc(doc(db, 'users', firebaseUser.uid));
+          const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000));
+          const userDoc = await Promise.race([userDocPromise, timeoutPromise]);
+          
           if (userDoc.exists()) {
             setCurrentUser(userDoc.data() as UserProfile);
             setOnboardingStep('app');
@@ -909,6 +992,11 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
           }
         } catch (err) {
           console.error("Error reading real firebase user configuration", err);
+          if (!isFirebaseMock) {
+            console.warn("Firestore unreachable or timed out during auth. Activating high-fidelity sandbox.");
+            const errorEvent = new CustomEvent('firestore-quota-exceeded', { detail: err });
+            window.dispatchEvent(errorEvent);
+          }
         }
       } else {
         setCurrentUser(null);
@@ -1016,6 +1104,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       }
     }, (error) => {
       console.error("Error reading users list:", error);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('firestore-quota-exceeded', { detail: error }));
+      }
     });
 
     // Real-time Feed Listener
@@ -1028,6 +1119,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       setPosts(fetchedPosts);
     }, (error) => {
       console.error("Error fetching posts:", error);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('firestore-quota-exceeded', { detail: error }));
+      }
     });
 
     // Real-time Stories Listener (filters out older than 24h)
@@ -1051,6 +1145,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       setStories(activeStories);
     }, (error) => {
       console.error("Error reading stories:", error);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('firestore-quota-exceeded', { detail: error }));
+      }
     });
 
     // Real-time Comments Listener
@@ -1063,6 +1160,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       setComments(fetchedComments);
     }, (error) => {
       console.error("Error fetching comments:", error);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('firestore-quota-exceeded', { detail: error }));
+      }
     });
 
     // Real-time Likes Listener
@@ -1075,6 +1175,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       setLikes(fetchedLikes);
     }, (error) => {
       console.error("Error fetching likes:", error);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('firestore-quota-exceeded', { detail: error }));
+      }
     });
 
     // Real-time Followers Listener
@@ -1087,6 +1190,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       setFollows(fetchedFollows);
     }, (error) => {
       console.error("Error fetching followers:", error);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('firestore-quota-exceeded', { detail: error }));
+      }
     });
 
     // Real-time Notifications Listener
@@ -1103,6 +1209,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       setNotifications(list);
     }, (error) => {
       console.error("Error reading notifications:", error);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('firestore-quota-exceeded', { detail: error }));
+      }
     });
 
     // Conversations Listener
@@ -1118,6 +1227,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       setConversations(list);
     }, (error) => {
       console.error("Error reading conversations:", error);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('firestore-quota-exceeded', { detail: error }));
+      }
     });
 
     // Real-time Reels Listener
@@ -1138,6 +1250,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       setReels(fetchedReels);
     }, (error) => {
       console.error("Error fetching reels:", error);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('firestore-quota-exceeded', { detail: error }));
+      }
     });
 
     // Real-time User Activities Listener
@@ -2323,6 +2438,8 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       posts,
       isFirebaseMock,
       enableMockBypass,
+      isQuotaExceeded,
+      setIsQuotaExceeded,
       stories,
       comments,
       conversations,
@@ -2336,6 +2453,8 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       setActiveTab,
       targetProfileUid,
       setTargetProfileUid,
+      activeLiveStreamId,
+      setActiveLiveStreamId,
       reels,
       createReel,
       toggleLikeReel,

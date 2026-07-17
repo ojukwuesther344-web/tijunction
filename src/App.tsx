@@ -41,8 +41,23 @@ function SocialAppContent() {
     setTargetProfileUid,
     darkMode,
     setDarkMode,
-    logout
+    logout,
+    isQuotaExceeded,
+    setIsQuotaExceeded,
+    isFirebaseMock
   } = useSocial();
+
+  const [isBannerDismissed, setIsBannerDismissed] = useState(false);
+
+  const handleResetFirebase = () => {
+    try {
+      localStorage.removeItem('collegio_force_mock');
+      localStorage.removeItem('collegio_quota_exceeded');
+      window.location.reload();
+    } catch (e) {
+      console.warn(e);
+    }
+  };
 
   // Nested sub-views state inside SettingsView
   const [activeSubView, setActiveSubView] = useState<string | null>(null);
@@ -220,6 +235,48 @@ function SocialAppContent() {
   // RENDER RESPONSIVE INTERFACES FOR DESKTOP & MOBILE
   return (
     <div className="min-h-screen bg-[#f1f3f6] font-sans antialiased text-slate-800 flex justify-center">
+      
+      {/* Dynamic Firestore Quota Warning Banner */}
+      {isQuotaExceeded && !isBannerDismissed && (
+        <div className="fixed top-4 left-4 right-4 md:left-auto md:right-4 md:w-[480px] z-50 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/50 shadow-2xl rounded-3xl p-4.5 text-slate-800 dark:text-slate-100 flex gap-3.5 items-start">
+          <div className="p-2 bg-amber-100 dark:bg-amber-950/50 rounded-2xl text-amber-600 dark:text-amber-400">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-wider text-left">Firestore Quota Exceeded</h3>
+            <p className="text-[11px] text-slate-600 dark:text-slate-300 font-semibold mt-1 leading-relaxed text-left">
+              Firebase free-tier daily write limits have been exhausted. To maintain a functional experience, we have automatically activated a high-fidelity local sandbox database.
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <button 
+                onClick={handleResetFirebase}
+                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-black rounded-xl transition-all cursor-pointer flex items-center gap-1"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                </svg>
+                Retry Real DB
+              </button>
+              <button 
+                onClick={() => setIsBannerDismissed(true)}
+                className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-[10px] font-black rounded-xl transition-all cursor-pointer"
+              >
+                Keep Sandbox
+              </button>
+            </div>
+          </div>
+          <button 
+            onClick={() => setIsBannerDismissed(true)}
+            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-all rounded-lg cursor-pointer"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
       
       {/* 1. UNIVERSAL DESKTOP DUAL VIEWPORT FRAME (Flex row on desktop, hidden on mobile) */}
       <div className="hidden md:flex w-full max-w-7xl mx-auto min-h-screen relative gap-6 px-4">

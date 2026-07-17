@@ -177,6 +177,51 @@ service cloud.firestore {
         && isStringOrTimestamp(data.createdAt);
     }
 
+    function isValidLiveStream(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.userId is string && (request.auth == null || data.userId == request.auth.uid || isAdmin() || isSeedUser(data.userId))
+        && (!('fullName' in data) || data.fullName is string)
+        && data.username is string && data.username.size() <= 60
+        && (!('profilePhoto' in data) || data.profilePhoto is string)
+        && data.status in ['live', 'ended']
+        && (!('viewerCount' in data) || (data.viewerCount is int || data.viewerCount is float))
+        && (!('likesCount' in data) || (data.likesCount is int || data.likesCount is float))
+        && (!('duration' in data) || (data.duration is int || data.duration is float))
+        && (!('streamMode' in data) || data.streamMode in ['camera', 'vlog'])
+        && (!('currentVlogIndex' in data) || (data.currentVlogIndex is int || data.currentVlogIndex is float))
+        && (!('isFilterActive' in data) || data.isFilterActive is bool)
+        && (!('isFlashOn' in data) || data.isFlashOn is bool)
+        && (!('micMuted' in data) || data.micMuted is bool)
+        && isStringOrTimestamp(data.createdAt)
+        && (!('endedAt' in data) || isStringOrTimestamp(data.endedAt));
+    }
+
+    function isValidLiveComment(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.streamId is string && data.streamId.size() <= 128
+        && data.userId is string && (request.auth == null || data.userId == request.auth.uid || isAdmin() || isSeedUser(data.userId))
+        && data.username is string && data.username.size() <= 60
+        && (!('profilePhoto' in data) || data.profilePhoto is string)
+        && data.text is string && data.text.size() <= 1000
+        && isStringOrTimestamp(data.createdAt);
+    }
+
+    function isValidLiveLike(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.streamId is string && data.streamId.size() <= 128
+        && data.userId is string && (request.auth == null || data.userId == request.auth.uid || isAdmin() || isSeedUser(data.userId))
+        && isStringOrTimestamp(data.createdAt);
+    }
+
+    function isValidLiveViewer(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.streamId is string && data.streamId.size() <= 128
+        && data.userId is string && (request.auth == null || data.userId == request.auth.uid || isAdmin() || isSeedUser(data.userId))
+        && data.username is string && data.username.size() <= 60
+        && (!('profilePhoto' in data) || data.profilePhoto is string)
+        && (data.lastActive is int || data.lastActive is float);
+    }
+
     // --- COLLECTION PATH MATCHERS ---
 
     match /users/{userId} {
@@ -292,6 +337,33 @@ service cloud.firestore {
       allow read, list: if isSignedIn();
       allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin() || isSeedUser(incoming().userId)) && isValidUserActivity(incoming());
       allow update, delete: if false;
+    }
+
+    match /liveStreams/{streamId} {
+      allow read, list: if true;
+      allow create: if isValidLiveStream(incoming());
+      allow update: if isValidLiveStream(incoming());
+      allow delete: if true;
+    }
+
+    match /liveComments/{commentId} {
+      allow read, list: if true;
+      allow create: if isValidLiveComment(incoming());
+      allow update: if false;
+      allow delete: if true;
+    }
+
+    match /liveLikes/{likeId} {
+      allow read, list: if true;
+      allow create: if isValidLiveLike(incoming());
+      allow update: if false;
+      allow delete: if true;
+    }
+
+    match /liveViewers/{viewerId} {
+      allow read, list: if true;
+      allow create, update: if isValidLiveViewer(incoming());
+      allow delete: if true;
     }
   }
 }
